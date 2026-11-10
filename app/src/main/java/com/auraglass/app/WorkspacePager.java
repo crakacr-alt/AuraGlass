@@ -2,7 +2,6 @@ package com.auraglass.app;
 
 import android.content.Context;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -25,15 +24,19 @@ public final class WorkspacePager {
     public static boolean addPage(Context context){
         int count=pageCount(context);
         if(count>=MAX_PAGES)return false;
-        Config.put(context,COUNT,count+1);
-        Config.put(context,"home_page_"+count,"");
+        Config.prefs(context).edit()
+            .putFloat(COUNT,(float)(count+1))
+            .putString("home_page_"+count,"")
+            .apply();
         return true;
     }
     public static boolean deleteLastEmpty(Context context){
         int count=pageCount(context);
         if(count<=1||!shortcuts(context,count-1).isEmpty())return false;
-        Config.put(context,COUNT,count-1);
-        Config.prefs(context).edit().remove("home_page_"+(count-1)).apply();
+        Config.prefs(context).edit()
+            .putFloat(COUNT,(float)(count-1))
+            .remove("home_page_"+(count-1))
+            .apply();
         return true;
     }
     private static String key(int page){
@@ -52,8 +55,7 @@ public final class WorkspacePager {
         }
         return result;
     }
-    public static void save(Context context,int page,List<String> shortcuts){
-        if(page>=pageCount(context))throw new IllegalArgumentException("Page missing");
+    private static String encode(List<String> shortcuts){
         StringBuilder content=new StringBuilder();
         Set<String> unique=new HashSet<>();
         for(String item:shortcuts){
@@ -62,7 +64,11 @@ public final class WorkspacePager {
             if(content.length()>0)content.append(';');
             content.append(item);
         }
-        Config.put(context,key(page),content.toString());
+        return content.toString();
+    }
+    public static void save(Context context,int page,List<String> shortcuts){
+        if(page>=pageCount(context))throw new IllegalArgumentException("Page missing");
+        Config.put(context,key(page),encode(shortcuts));
     }
     public static boolean hasAnywhere(Context context,String component){
         for(int page=0;page<pageCount(context);page++)
@@ -108,8 +114,11 @@ public final class WorkspacePager {
         // All validation happens before source removal.
         source.remove(fromIndex);
         dest.add(Math.min(Math.max(0,toIndex),dest.size()),moving);
-        save(context,fromPage,source);
-        save(context,toPage,dest);
+        // Both pages update atomically in one SharedPreferences transaction.
+        Config.prefs(context).edit()
+            .putString(key(fromPage),encode(source))
+            .putString(key(toPage),encode(dest))
+            .apply();
         return true;
     }
 }
