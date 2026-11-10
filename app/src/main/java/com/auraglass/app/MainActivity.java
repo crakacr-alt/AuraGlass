@@ -34,7 +34,7 @@ import java.util.List;
 public final class MainActivity extends Activity {
     private final int TEXT=0xfff3f0ff, MUTED=0xffc2bfd7;
     private AtmospherePreviewView preview;
-    private TextView weatherStatus;
+    private TextView weatherStatus,activationStatus;
     private final List<Button> weatherButtons=new ArrayList<>(),timeButtons=new ArrayList<>();
     private EditText city;
     private int dp(float n){return (int)(getResources().getDisplayMetrics().density*n+.5f);}
@@ -81,6 +81,15 @@ public final class MainActivity extends Activity {
         TextView hint=text("Предпросмотр реагирует на все настройки. Применение обоев подтверждает Android.",12,false);
         hint.setTextColor(MUTED);add(content,hint,-2);
 
+        section(content,"Применение темы","Android спросит подтверждение, системные обои не заменяются автоматически.");
+        LinearLayout activate=surface();add(content,activate,-2);
+        activationStatus=text("Проверяем состояние оформления…",13,true);
+        activate.addView(activationStatus,params(-1,-2));
+        add(activate,action("Установить живые обои AURA",()->Activation.requestWallpaper(this)),50);
+        add(activate,action("Назначить AURA главным экраном",()->Activation.requestHome(this)),50);
+        add(activate,action("Вернуться к экрану активации",()->startActivity(new Intent(this,SetupActivity.class))),47);
+        updateActivationStatus();
+
         section(content,"Атмосфера","Выбери реальную погоду или художественный эффект.");
         LinearLayout weatherModes=vertical();add(content,weatherModes,-2);
         modeRow(weatherModes,true,new String[]{"auto","clear","rain"},new String[]{"Авто","Ясно","Дождь"});
@@ -103,11 +112,11 @@ public final class MainActivity extends Activity {
 
         section(content,"Обои и лаунчер","Обои не меняются без подтверждения. Один тап возвращает в настройки Android.");
         LinearLayout actions=surface();add(content,actions,-2);
-        add(actions,action("✦  Предпросмотр живых обоев",this::chooseAuraWallpaper),49);
-        add(actions,action("▧  Выбрать системные обои",()->safeStart(new Intent(Intent.ACTION_SET_WALLPAPER))),49);
+        add(actions,action("✦  Установить живые обои",()->Activation.requestWallpaper(this)),49);
+        add(actions,action("▧  Выбрать системные обои",()->Activation.chooseSystemWallpaper(this)),49);
         add(actions,action("◈  Открыть рабочий стол AURA",()->startActivity(new Intent(this,HomeActivity.class))),49);
-        add(actions,action("✓  Назначить лаунчер по умолчанию",this::requestHome),49);
-        add(actions,action("↶  Вернуться к One UI Home",()->safeStart(new Intent(Settings.ACTION_HOME_SETTINGS))),49);
+        add(actions,action("✓  Назначить лаунчер по умолчанию",()->Activation.requestHome(this)),49);
+        add(actions,action("↶  Вернуться к One UI Home",()->Activation.chooseSystemHome(this)),49);
 
         section(content,"Погода","Open-Meteo. Встроенная карточка анимирована; обычный Android-виджет обновляется статически.");
         LinearLayout weatherCard=surface();add(content,weatherCard,-2);
@@ -226,5 +235,14 @@ public final class MainActivity extends Activity {
         super.onRequestPermissionsResult(request,permissions,results);
         if(request==102&&results.length>0&&results[0]==PackageManager.PERMISSION_GRANTED)locate();
     }
-    @Override protected void onResume(){super.onResume();if(preview!=null)preview.reload();}
+    private void updateActivationStatus(){
+        if(activationStatus==null)return;
+        activationStatus.setText((Activation.isHomeActive(this)?"✓ Лаунчер включён":"○ Лаунчер не выбран")+
+            "   ·   "+(Activation.isLiveWallpaperActive(this)?"✓ Живые обои включены":"○ Живые обои не выбраны"));
+    }
+    @Override protected void onResume(){
+        super.onResume();
+        if(preview!=null)preview.reload();
+        updateActivationStatus();
+    }
 }

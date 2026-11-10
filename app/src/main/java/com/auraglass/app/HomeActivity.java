@@ -48,10 +48,13 @@ public final class HomeActivity extends Activity {
     }
     @Override protected void onCreate(Bundle state){
         super.onCreate(state);
+        getWindow().setNavigationBarColor(Color.TRANSPARENT);
+        getWindow().setStatusBarColor(Color.TRANSPARENT);
         getWindow().getDecorView().setSystemUiVisibility(
             View.SYSTEM_UI_FLAG_LAYOUT_STABLE|View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN|
             View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION);
         root=new FrameLayout(this);
+        root.setBackgroundColor(Color.TRANSPARENT);
         setContentView(root);
         loadApps();
         buildHome();
@@ -93,7 +96,7 @@ public final class HomeActivity extends Activity {
         GridView grid=gridFor(apps.subList(0,Math.min(12,apps.size())));
         icons.addView(grid,new FrameLayout.LayoutParams(-1,dp(258)));
         content.addView(icons,new LinearLayout.LayoutParams(-1,dp(276)));
-        TextView all=label("  ●  ●  ●      ПРИЛОЖЕНИЯ      ●  ●  ●  ",11);
+        TextView all=label("⌃    Все приложения    ⌃",13);
         all.setGravity(Gravity.CENTER);
         all.setOnClickListener(v->openDrawer());
         LinearLayout.LayoutParams ap=new LinearLayout.LayoutParams(-1,dp(48));ap.topMargin=dp(4);

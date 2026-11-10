@@ -1,36 +1,38 @@
 # AURA GLASS · Android Launcher & Live Atmosphere
 
-A native Android prototype for a Samsung/One UI-friendly launcher, living wallpaper, glass editor, and weather.
+Native Android prototype for an adaptive Samsung-friendly launcher, animated wallpapers, glass editor and weather.
 
-## Current milestone: 0.1.0-alpha
+## v0.2 alpha — installation and activation
 
-- Fullscreen wallpaper renderer with deterministic rain, snow, frost, mist, stars, aurora, moon/sun and atmospheric gradients
-- Smooth time-of-day color changes and 3.4-second weather-effect crossfades; frame rate adapts to power saver and slow render frames
-- Android live wallpaper service; installed only after the user's system confirmation
-- AURA Home launcher with installed apps, app drawer, search, a custom animated weather panel
-- Native in-app preview and preference controls for weather, time, effects, animation speed, opacity and FPS
-- Android homescreen widget (static RemoteViews snapshot; ordinary external widgets cannot run a 60 FPS custom Canvas animation)
-- Weather via Open-Meteo: select a city or grant **approximate** location permission
-- Weather widget / card attempts to open Samsung Weather, falling back to AURA if not available
-- Original/system wallpaper remains unchanged **unless the user explicitly confirms AURA live wallpaper**; to restore earlier wallpaper, the user uses Android's wallpaper picker
-- AURA Home default launcher is selected through Android's HOME role/settings, and can be reverted to One UI Home there
+The **app icon opens a dedicated setup screen** with separate controls and status indicators for the launcher and live wallpaper. No root or system modifications are involved.
 
-## Download APK
+1. Install the APK from [v0.2-alpha Releases](https://github.com/crakacr-alt/AuraGlass/releases/tag/v0.2-alpha).
+2. Open AURA GLASS from your application list.
+3. Choose **Сделать AURA главным экраном** and confirm Android's home app dialog.
+4. Independently choose **Установить живые обои AURA**, and select AURA Live Atmosphere in Android's system picker.
+5. Leave your wallpaper unchanged if you want. Enter **Редактор** to adjust weather, time-of-day, opacity, effect strength and rendering rate.
+6. Choose **Вернуть One UI Home** to open Android's Home default settings; choose the original Samsung launcher.
+7. To return to previous wallpaper, use Samsung **Обои и стиль**; the wallpaper is not silently backed up or restored.
 
-- **[Direct Android APK from GitHub Releases](https://github.com/crakacr-alt/AuraGlass/releases/download/v0.1-alpha/AuraGlass-v0.1-alpha.apk)**
-- **[Release page](https://github.com/crakacr-alt/AuraGlass/releases/tag/v0.1-alpha)**
-- The APK is published only after the Android CI build succeeds. It is an unsigned-for-production, debug-signed alpha and not yet validated on a Galaxy S24 Ultra.
-- If a newly built alpha cannot be installed over an older build, uninstall the earlier test build first; debug keys may change between GitHub runners.
+> The v0.1 alpha was merely a working compile and lacked a proper first-run activation experience. Please **uninstall that test version** before trying v0.2: GitHub runners generate different debug-signing keys.
+
+## Prototype capabilities
+
+- Native home screen with app drawer, installed apps and animated weather card
+- Live-wallpaper service with gradients, sun/moon, stars, rain, snow, frost, mist, aurora
+- Gradual daylight changes and weather crossfades
+- Manual weather mode or Open-Meteo city weather, approximate geolocation permission when opted in
+- Android weather widget with static RemoteViews snapshots; frame-by-frame animation is only in AURA Home
+- Samsung Weather opening where a compatible activity is available
+- AURA setup state diagnostics and easy system-based reversal
+- No native dependencies: Android 8.0+; ARMv7 and ARM64 supported if device supports API 26+
+
+## Quality and limitations
+
+This is **not yet a visually complete recreation of the concept renders**. Visual fidelity, blur/refraction, weather realism, smooth gestures and real Samsung compatibility need substantial development and device verification. The launcher currently has a basic application grid rather than a full One UI replacement (folders, drag/drop and editable desktop not yet implemented).
+
+CI builds the APK, validates its HOME and live-wallpaper manifest entries, runs Setup/Home/Editor on an Android emulator, and saves screenshots as GitHub Actions artifacts. Emulator success does not guarantee Samsung behavior. No invasive overlay permissions or system modifications are used. Render loops only run while visible; battery saver reduces updates.
 
 ## Build
 
-- Android Studio: open repository, sync Gradle, run `app`
-- GitHub Actions: **Actions → Build AuraGlass APK → Run workflow**, or push on `main`
-- Download `AuraGlass-v0.1-alpha-debug` from the workflow run's **Artifacts**
-- Android 8.0+ (API 26); pure Java/Dex, no architecture-specific native dependencies, so compatible with ARMv7 and arm64 under supported Android versions
-
-## Limitations / quality gates
-
-This is an **early functional prototype**, not yet the photorealistic visual fidelity of the reference illustrations. The next stages require Android device screenshots, performance measurements, real-device navigation/gesture testing, real wallpaper integration checks and Samsung Weather intent verification. The interface does **not** reskin Samsung Quick Settings, lockscreen or other apps; these are system-managed UI.
-
-Safety and privacy: no root, no overlays above other apps, no accessibility service, no wallpaper replacement in the background, no tracking SDK. Coordinates are only sent to Open-Meteo for an opted-in weather forecast. Network calls occur off the main thread. Live wallpaper rendering pauses when invisible; power saver lowers frame rate.
+Open in Android Studio using JDK 17 / Gradle 8.10.2, or use GitHub Actions. Source project is Java 17, Android Gradle Plugin 8.7.3, compileSdk 35.
