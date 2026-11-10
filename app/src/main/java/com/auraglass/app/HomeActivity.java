@@ -107,6 +107,69 @@ public final class HomeActivity extends Activity {
         }
         return result;
     }
+    private List<ResolveInfo> dockEntries(){
+        if(!Config.prefs(this).contains("dock_apps")){
+            List<ResolveInfo> selected=selectByPackages(new String[]{
+                "com.google.android.dialer","com.samsung.android.dialer","com.android.dialer",
+                "com.google.android.apps.messaging","com.samsung.android.messaging",
+                "com.android.chrome","com.sec.android.app.sbrowser",
+                "com.sec.android.app.camera","com.android.camera","com.android.settings"},5);
+            if(selected.size()<5){
+                Set<String> used=new HashSet<>();
+                for(ResolveInfo item:selected)used.add(componentKey(item));
+                for(ResolveInfo item:applications){
+                    if(selected.size()>=5)break;
+                    if(used.add(componentKey(item)))selected.add(item);
+                }
+            }
+            persistDock(selected);
+            return selected;
+        }
+        List<ResolveInfo> chosen=new ArrayList<>();
+        String stored=Config.str(this,"dock_apps","");
+        for(String key:stored.split(";")){
+            for(ResolveInfo app:applications){
+                if(componentKey(app).equals(key)){chosen.add(app);break;}
+            }
+            if(chosen.size()>=5)break;
+        }
+        return chosen;
+    }
+    private void persistDock(List<ResolveInfo> entries){
+        StringBuilder sb=new StringBuilder();
+        for(ResolveInfo app:entries){
+            if(sb.length()>0)sb.append(';');
+            sb.append(componentKey(app));
+        }
+        Config.put(this,"dock_apps",sb.toString());
+    }
+    private void changeDock(ResolveInfo entry,boolean add){
+        List<ResolveInfo> list=dockEntries();
+        String key=componentKey(entry);
+        if(add){
+            if(list.size()>=5){Toast.makeText(this,"В доке максимум 5 приложений",Toast.LENGTH_SHORT).show();return;}
+            for(ResolveInfo item:list)if(componentKey(item).equals(key)){
+                Toast.makeText(this,"Уже находится в доке",Toast.LENGTH_SHORT).show();return;
+            }
+            list.add(entry);
+        }else list.removeIf(app->componentKey(app).equals(key));
+        persistDock(list);
+        if(drawer!=null)closeDrawer(false);
+        showHome();
+    }
+    private void shiftItem(ResolveInfo entry,boolean inDock,int direction){
+        List<ResolveInfo> entries=inDock?dockEntries():favorites();
+        String key=componentKey(entry);
+        int index=-1;
+        for(int i=0;i<entries.size();i++)
+            if(key.equals(componentKey(entries.get(i)))){index=i;break;}
+        int next=index+direction;
+        if(index<0||next<0||next>=entries.size())return;
+        Collections.swap(entries,index,next);
+        if(inDock)persistDock(entries);
+        else persistFavorites(entries);
+        showHome();
+    }
     private List<ResolveInfo> selectByPackages(String[] matches,int max){
         List<ResolveInfo> result=new ArrayList<>();
         Set<String> visited=new HashSet<>();
@@ -215,19 +278,7 @@ public final class HomeActivity extends Activity {
 
         GlassPanel dock=new GlassPanel(this);
         dock.setPadding(dp(8),dp(4),dp(8),dp(4));
-        List<ResolveInfo> common=selectByPackages(new String[]{
-            "com.google.android.dialer","com.samsung.android.dialer","com.android.dialer",
-            "com.google.android.apps.messaging","com.samsung.android.messaging",
-            "com.android.chrome","com.sec.android.app.sbrowser",
-            "com.sec.android.app.camera","com.android.camera","com.android.settings"},5);
-        if(common.size()<5){
-            Set<String> ids=new HashSet<>();
-            for(ResolveInfo r:common)ids.add(componentKey(r));
-            for(ResolveInfo r:applications){
-                if(common.size()>=5)break;
-                if(ids.add(componentKey(r)))common.add(r);
-            }
-        }
+        List<ResolveInfo> common=dockEntries();
         dock.addView(icons(common,5,false,true),new FrameLayout.LayoutParams(-1,dp(71)));
         vertical.addView(dock,new LinearLayout.LayoutParams(-1,dp(80)));
         if(Config.bool(this,"island_enabled",true)){
@@ -351,11 +402,21 @@ public final class HomeActivity extends Activity {
             cell.addView(text,lp);
             cell.setOnClickListener(v->launch(entry));
             cell.setOnLongClickListener(v->{
+                String[] options;
+                if(dock)options=new String[]{"Сдвинуть влево","Сдвинуть вправо","Убрать из дока"};
+                else if(onHome)options=new String[]{"Сдвинуть влево","Сдвинуть вправо","Убрать с главного"};
+                else options=new String[]{"Закрепить на главном","Добавить в док"};
                 new AlertDialog.Builder(HomeActivity.this)
                     .setTitle(entry.loadLabel(getPackageManager()))
-                    .setItems(onHome?new String[]{"Убрать с главного экрана"}:
-                        new String[]{"Закрепить на главном экране"},(dialog,choice)->
-                        changeFavorite(entry,!onHome))
+                    .setItems(options,(dialog,which)->{
+                        if(dock||onHome){
+                            if(which==0)shiftItem(entry,dock,-1);
+                            else if(which==1)shiftItem(entry,dock,1);
+                            else if(dock)changeDock(entry,false);
+                            else changeFavorite(entry,false);
+                        }else if(which==0)changeFavorite(entry,true);
+                        else changeDock(entry,true);
+                    })
                     .setNegativeButton("Отмена",null)
                     .show();
                 return true;
