@@ -26,8 +26,18 @@ public final class AuraEventListener extends NotificationListenerService {
             this.open=open;this.reject=reject;this.mute=mute;
         }
     }
+    public static final class AlertEvent {
+        public final String key,source,title,description;
+        public final PendingIntent open;
+        public final long time;
+        AlertEvent(String key,String source,String title,String description,PendingIntent open,long time){
+            this.key=key;this.source=source;this.title=title;this.description=description;this.open=open;
+            this.time=time;
+        }
+    }
     private static final Handler MAIN=new Handler(Looper.getMainLooper());
     private static volatile CallEvent call;
+    private static volatile AlertEvent alert;
     private static WeakReference<Runnable> changeListener=new WeakReference<>(null);
 
     public static void observe(Runnable listener){
@@ -43,6 +53,8 @@ public final class AuraEventListener extends NotificationListenerService {
         });
     }
     public static CallEvent call(){return call;}
+    public static AlertEvent alert(){return alert;}
+    public static void dismissAlert(){alert=null;notifyUi();}
     public static boolean granted(Context context){
         ComponentName component=new ComponentName(context,AuraEventListener.class);
         if(Build.VERSION.SDK_INT>=27){
@@ -56,19 +68,22 @@ public final class AuraEventListener extends NotificationListenerService {
     @Override public void onListenerConnected(){
         super.onListenerConnected();
         try{
-            for(StatusBarNotification item:getActiveNotifications())updateCall(item);
+            for(StatusBarNotification item:getActiveNotifications()){
+                updateCall(item);updateAlert(item);
+            }
         }catch(RuntimeException ignored){}
         notifyUi();
     }
     @Override public void onNotificationPosted(StatusBarNotification sbn){
-        updateCall(sbn);notifyUi();
+        updateCall(sbn);updateAlert(sbn);notifyUi();
     }
     @Override public void onNotificationRemoved(StatusBarNotification sbn){
         if(call!=null&&call.key.equals(sbn.getKey()))call=null;
+        if(alert!=null&&alert.key.equals(sbn.getKey()))alert=null;
         notifyUi();
     }
     @Override public void onListenerDisconnected(){
-        call=null;notifyUi();
+        call=null;alert=null;notifyUi();
         super.onListenerDisconnected();
     }
     private static String bound(CharSequence s,String fallback){
@@ -79,7 +94,7 @@ public final class AuraEventListener extends NotificationListenerService {
     private void updateCall(StatusBarNotification sbn){
         if(sbn==null)return;
         Notification n=sbn.getNotification();
-        if(n==null||!Notification.CATEGORY_CALL.equals(n.category))return;
+        if(n==null||n.extras==null||!Notification.CATEGORY_CALL.equals(n.category))return;
         String caller=bound(n.extras.getCharSequence(Notification.EXTRA_TITLE),"Вызов");
         String detail=bound(n.extras.getCharSequence(Notification.EXTRA_TEXT),"Телефон");
         PendingIntent reject=null,mute=null;
@@ -96,6 +111,24 @@ public final class AuraEventListener extends NotificationListenerService {
             }
         }
         call=new CallEvent(sbn.getKey(),sbn.getPackageName(),caller,detail,n.contentIntent,reject,mute);
+    }
+    private void updateAlert(StatusBarNotification sbn){
+        if(sbn==null||getPackageName().equals(sbn.getPackageName()))return;
+        Notification n=sbn.getNotification();
+        if(n==null||n.extras==null||Notification.CATEGORY_CALL.equals(n.category)||
+           Notification.CATEGORY_TRANSPORT.equals(n.category)||
+           n.visibility==Notification.VISIBILITY_SECRET||
+           (n.flags&Notification.FLAG_ONGOING_EVENT)!=0)return;
+        if(n.contentIntent==null)return;
+        String title=bound(n.extras.getCharSequence(Notification.EXTRA_TITLE),"Уведомление");
+        String description=bound(n.extras.getCharSequence(Notification.EXTRA_TEXT),"");
+        String source=sbn.getPackageName();
+        try{
+            android.content.pm.PackageManager pm=getPackageManager();
+            source=pm.getApplicationLabel(pm.getApplicationInfo(source,0)).toString();
+        }catch(Exception ignored){}
+        AlertEvent next=new AlertEvent(sbn.getKey(),source,title,description,n.contentIntent,sbn.getPostTime());
+        if(alert==null||next.time>=alert.time)alert=next;
     }
     public static boolean execute(PendingIntent action){
         if(action==null)return false;

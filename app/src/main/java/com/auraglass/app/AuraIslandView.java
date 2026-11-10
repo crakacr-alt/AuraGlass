@@ -50,14 +50,15 @@ public final class AuraIslandView extends FrameLayout {
         }
     };
     private final LinearLayout detail;
-    private final LinearLayout mediaBody,callBody,otherBody;
+    private final LinearLayout mediaBody,callBody,alertBody,otherBody;
     private final TextView compactTitle,compactCaption,title,artist,appName,position,
-        duration,callTitle,callDetails,audioStatus,otherLabel;
+        duration,callTitle,callDetails,audioStatus,otherLabel,alertTitle,alertDetails;
     private final ImageView cover;
     private final SeekBar seek;
     private final Button play,next,previous,openPlayer,openCall,decline,mute,allowAudio;
     private AuraMedia.Track playing;
     private AuraEventListener.CallEvent currentCall;
+    private AuraEventListener.AlertEvent currentAlert;
     private boolean active,expanded,seekDragging;
     private String state="idle";
     private ValueAnimator sizeAnimation;
@@ -128,6 +129,9 @@ public final class AuraIslandView extends FrameLayout {
                 float diff=e2.getY()-e1.getY();
                 if(diff>dp(36)){setExpanded(true);return true;}
                 if(diff<-dp(36)){setExpanded(false);return true;}
+                if(Math.abs(e2.getX()-e1.getX())>dp(60)&&"alert".equals(state)){
+                    AuraEventListener.dismissAlert();setExpanded(false);return true;
+                }
                 return false;
             }
         });
@@ -213,6 +217,24 @@ public final class AuraIslandView extends FrameLayout {
         callBody.addView(notice,new LinearLayout.LayoutParams(-1,dp(32)));
         detail.addView(callBody,new LinearLayout.LayoutParams(-1,-2));
 
+        alertBody=column();
+        alertTitle=text("Новое уведомление",20,true);
+        alertBody.addView(alertTitle,new LinearLayout.LayoutParams(-1,dp(40)));
+        alertDetails=text("Содержание скрыто",13,false);
+        alertDetails.setSingleLine(false);
+        alertDetails.setTextColor(0xffc6d3e2);
+        alertBody.addView(alertDetails,new LinearLayout.LayoutParams(-1,dp(62)));
+        LinearLayout alertActions=new LinearLayout(activity);
+        addAction(alertActions,button("Открыть",()->{
+            if(currentAlert!=null)AuraEventListener.execute(currentAlert.open);
+        }),1);
+        addAction(alertActions,button("Скрыть в AURA",AuraEventListener::dismissAlert),1);
+        alertBody.addView(alertActions,new LinearLayout.LayoutParams(-1,dp(50)));
+        TextView privacy=text("Текст скрыт по умолчанию; системное уведомление сохраняется.",11,false);
+        privacy.setTextColor(0xffbcc7d7);privacy.setSingleLine(false);
+        alertBody.addView(privacy,new LinearLayout.LayoutParams(-1,dp(35)));
+        detail.addView(alertBody,new LinearLayout.LayoutParams(-1,-2));
+
         otherBody=column();
         otherLabel=text("Включите доступ к уведомлениям для музыки и событий.",13,false);
         otherLabel.setSingleLine(false);otherLabel.setGravity(Gravity.CENTER);
@@ -245,7 +267,7 @@ public final class AuraIslandView extends FrameLayout {
     }
     private void settings(){
         final String[] choices={"Доступ к уведомлениям","Показывать имя/номер звонящего",
-            "Звук AURA","Открыть редактор AURA","Отключить островок"};
+            "Показывать текст уведомлений","Звук AURA","Открыть редактор AURA","Отключить островок"};
         new AlertDialog.Builder(host).setTitle("AURA Island")
             .setItems(choices,(dialog,which)->{
                 switch(which){
@@ -256,9 +278,15 @@ public final class AuraIslandView extends FrameLayout {
                         Toast.makeText(host,!show?"Имя/номер будут показаны":"Данные звонящего скрыты",Toast.LENGTH_SHORT).show();
                         refresh();break;
                     }
-                    case 2:AuraAudioMixer.show(host);break;
-                    case 3:host.startActivity(new Intent(host,MainActivity.class));break;
-                    case 4:{
+                    case 2:{
+                        boolean show=Config.bool(host,"island_show_notification_text",false);
+                        Config.put(host,"island_show_notification_text",!show);
+                        Toast.makeText(host,!show?"Текст уведомлений включён":"Текст уведомлений скрыт",Toast.LENGTH_SHORT).show();
+                        refresh();break;
+                    }
+                    case 3:AuraAudioMixer.show(host);break;
+                    case 4:host.startActivity(new Intent(host,MainActivity.class));break;
+                    case 5:{
                         new AlertDialog.Builder(host).setTitle("Отключить островок?")
                             .setMessage("Чтобы снова включить, откройте редактор AURA.")
                             .setNegativeButton("Отмена",null)
@@ -297,11 +325,12 @@ public final class AuraIslandView extends FrameLayout {
         state=next;
         mediaBody.setVisibility("media".equals(next)?VISIBLE:GONE);
         callBody.setVisibility("call".equals(next)?VISIBLE:GONE);
-        otherBody.setVisibility(!"media".equals(next)&&!"call".equals(next)?VISIBLE:GONE);
+        alertBody.setVisibility("alert".equals(next)?VISIBLE:GONE);
+        otherBody.setVisibility("idle".equals(next)?VISIBLE:GONE);
         if(expanded)animateHeight(dp(targetHeight()),false);
     }
     private int targetHeight(){
-        return "media".equals(state)?310:"call".equals(state)?224:219;
+        return "media".equals(state)?339:"call".equals(state)?224:"alert".equals(state)?257:219;
     }
     private void toggle(){
         setExpanded(!expanded);
@@ -346,9 +375,10 @@ public final class AuraIslandView extends FrameLayout {
     private void refresh(){
         if(!active)return;
         AuraEventListener.CallEvent call=AuraEventListener.call();
+        AuraEventListener.AlertEvent alert=AuraEventListener.alert();
         AuraMedia.Track track=AuraMedia.current(host);
-        currentCall=call;playing=track;
-        String mode=call!=null?"call":track!=null?"media":"idle";
+        currentCall=call;currentAlert=alert;playing=track;
+        String mode=call!=null?"call":track!=null&&track.playing?"media":alert!=null?"alert":track!=null?"media":"idle";
         if(!mode.equals(state))showMode(mode);
         if("call".equals(mode)){
             smallWave.stopAudio();bigWave.stopAudio();spectrum.stop();
@@ -388,6 +418,13 @@ public final class AuraIslandView extends FrameLayout {
                 spectrum.stop();smallWave.stopAudio();bigWave.stopAudio();
                 audioStatus.setText(allowed?"Воспроизведение остановлено":"Включите аудиоанализ для настоящей звуковой волны");
             }
+        }else if("alert".equals(mode)){
+            spectrum.stop();smallWave.stopAudio();bigWave.stopAudio();
+            compactTitle.setText(alert.source);
+            compactCaption.setText("Новое уведомление");
+            boolean reveal=Config.bool(host,"island_show_notification_text",false);
+            alertTitle.setText(reveal?alert.title:"Уведомление · "+alert.source);
+            alertDetails.setText(reveal?alert.description:"Содержимое скрыто в настройках AURA");
         }else{
             spectrum.stop();smallWave.stopAudio();bigWave.stopAudio();
             compactTitle.setText("AURA Island");

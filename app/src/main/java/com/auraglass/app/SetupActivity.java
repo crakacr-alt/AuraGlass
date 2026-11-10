@@ -155,6 +155,14 @@ public final class SetupActivity extends Activity {
         callerToggle.setOnCheckedChangeListener((button,checked)->
             Config.put(this,"island_show_caller",checked));
         islandSection.addView(callerToggle,new LinearLayout.LayoutParams(-1,dp(49)));
+        android.widget.Switch noticeToggle=new android.widget.Switch(this);
+        noticeToggle.setText("Показывать текст уведомлений");
+        noticeToggle.setTextColor(Color.WHITE);
+        noticeToggle.setTextSize(13);
+        noticeToggle.setChecked(Config.bool(this,"island_show_notification_text",false));
+        noticeToggle.setOnCheckedChangeListener((button,checked)->
+            Config.put(this,"island_show_notification_text",checked));
+        islandSection.addView(noticeToggle,new LinearLayout.LayoutParams(-1,dp(49)));
         addButton(islandSection,"Разрешить доступ к уведомлениям",()->{
             try{startActivity(new Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS));}
             catch(RuntimeException ignored){}
