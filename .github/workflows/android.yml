@@ -87,6 +87,11 @@ jobs:
             # not from the ADB shell UID, preserving Android component isolation.
             # Debug-only trampoline verifies internal pages without exporting
             # their production manifest components to other applications.
+            # Verify persistent folder CRUD using real SharedPreferences in debug APK.
+            adb shell am start -W -n com.auraglass.app/.QaEntryActivity --es target folders
+            sleep 1
+            adb logcat -d -s AURA_QA:I > screenshots/folder-crud.txt
+            grep -q 'FOLDERS_OK' screenshots/folder-crud.txt
             adb shell am start -W -n com.auraglass.app/.QaEntryActivity --es target diagnostics
             sleep 3
             adb shell pidof com.auraglass.app
