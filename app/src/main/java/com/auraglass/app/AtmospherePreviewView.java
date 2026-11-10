@@ -47,7 +47,7 @@ public final class AtmospherePreviewView extends View {
         if(running){
             android.os.PowerManager pm=(android.os.PowerManager)getContext().getSystemService(Context.POWER_SERVICE);
             boolean saver=pm!=null&&pm.isPowerSaveMode();
-            postInvalidateDelayed(saver?67:(Config.bool(getContext(),"high_fps",false)?17:34));
+            postInvalidateDelayed(saver?120:(Config.bool(getContext(),"high_fps",false)?33:55));
         }
     }
     @Override protected void onAttachedToWindow(){super.onAttachedToWindow();running=true;invalidate();}

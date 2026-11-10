@@ -2,11 +2,11 @@
 
 Native Android prototype for an adaptive Samsung-friendly launcher, animated wallpapers, glass editor and weather.
 
-## v0.2.1 alpha — installation and activation
+## v0.2.2 alpha — installation and activation
 
 The **app icon opens a dedicated setup screen** with separate controls and status indicators for the launcher and live wallpaper. No root or system modifications are involved.
 
-1. Install the APK from [v0.2.1-alpha Releases](https://github.com/crakacr-alt/AuraGlass/releases/tag/v0.2.1-alpha).
+1. Install the APK from [v0.2.2-alpha Releases](https://github.com/crakacr-alt/AuraGlass/releases/tag/v0.2.2-alpha).
 2. Open AURA GLASS from your application list.
 3. Choose **Сделать AURA главным экраном** and confirm Android's home app dialog.
 4. Independently choose **Установить живые обои AURA**, and select AURA Live Atmosphere in Android's system picker.
