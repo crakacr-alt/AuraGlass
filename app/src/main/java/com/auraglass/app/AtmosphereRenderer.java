@@ -204,7 +204,7 @@ public final class AtmosphereRenderer {
         // Foreground cold glass: the fingertip warms the film, then moisture returns.
         float glassFilm=glassTouch?.21f:0f;
         float frozenSurface=Math.max(glassFilm,icePower*climateBoost);
-        iceGlass.draw(c,width,height,ms,frozenSurface);
+        iceGlass.draw(c,width,height,ms,frozenSurface,renderQuality);
     }
     private void disk(Canvas c,float x,float y,float r,int color){p.setShader(null);p.setColor(color);c.drawCircle(x,y,r,p);}
     private void glow(Canvas c,float x,float y,float radius,int color){

@@ -188,7 +188,9 @@ public final class IceGlassLayer {
     private void thermalStep(long now){
         if(lastUpdate==0){lastUpdate=now;return;}
         float dt=Math.max(0,Math.min(100,now-lastUpdate));
-        if(dt<30)return;
+        // The film updates at ~12 Hz; a faster thermal solver wastes CPU
+        // while its visual alpha mask stays unchanged.
+        if(dt<REBUILD_MS)return;
         lastUpdate=now;
         float diffusion=.10f*(dt/60f);
         float cooling=(float)Math.exp(-dt/(1500f*recovery));
@@ -254,6 +256,10 @@ public final class IceGlassLayer {
     }
 
     public void draw(Canvas canvas,int width,int height,long now,float sceneStrength){
+        draw(canvas,width,height,now,sceneStrength,1f);
+    }
+    public void draw(Canvas canvas,int width,int height,long now,float sceneStrength,
+                     float renderQuality){
         if(sceneStrength<=.002f||intensity<=0||width<=0||height<=0)return;
         boolean activeCooling=lastTouchedGlobal>0&&now-lastTouchedGlobal<11500;
         if(activeCooling)thermalStep(now);
@@ -267,10 +273,12 @@ public final class IceGlassLayer {
         bitmapPaint.setAlpha(255);
         // Thin offset highlight imitates refracted light at micro-crystal edges,
         // without claiming real screen-space refraction on a software Canvas.
-        bitmapPaint.setAlpha(Math.min(50,(int)(25*sceneStrength)));
-        destination.offset(Math.max(1f,width*.0008f),Math.max(1f,height*.0005f));
-        canvas.drawBitmap(mask,source,destination,bitmapPaint);
-        destination.offset(-Math.max(1f,width*.0008f),-Math.max(1f,height*.0005f));
+        if(renderQuality>=.72f){
+            bitmapPaint.setAlpha(Math.min(50,(int)(25*sceneStrength)));
+            destination.offset(Math.max(1f,width*.0008f),Math.max(1f,height*.0005f));
+            canvas.drawBitmap(mask,source,destination,bitmapPaint);
+            destination.offset(-Math.max(1f,width*.0008f),-Math.max(1f,height*.0005f));
+        }
         bitmapPaint.setAlpha(255);
         canvas.drawBitmap(mask,source,destination,bitmapPaint);
         // Glints on nucleation tips stay small and do not flash or allocate on every frame.
