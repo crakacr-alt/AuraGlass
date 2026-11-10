@@ -173,6 +173,11 @@ public final class HomeActivity extends Activity {
         date.setShadowLayer(dp(4),0,dp(1),0x99000000);
         texts.addView(date);
         header.addView(texts,new LinearLayout.LayoutParams(0,dp(88),1));
+        TextView widgetButton=label("▦",27,false);
+        widgetButton.setGravity(Gravity.CENTER);
+        widgetButton.setContentDescription("Открыть страницу виджетов AURA");
+        widgetButton.setOnClickListener(v->startActivity(new Intent(this,WidgetBoardActivity.class)));
+        header.addView(widgetButton,new LinearLayout.LayoutParams(dp(50),dp(50)));
         TextView gear=label("⚙",28,false);
         gear.setGravity(Gravity.CENTER);
         gear.setContentDescription("Открыть редактор AURA");
