@@ -83,6 +83,10 @@ jobs:
             sleep 5
             adb shell pidof com.auraglass.app
             adb exec-out screencap -p > screenshots/01-setup.png
+            adb shell am start -W -n com.auraglass.app/.DiagnosticsActivity
+            sleep 2
+            adb shell pidof com.auraglass.app
+            adb exec-out screencap -p > screenshots/11-diagnostics.png
             adb shell am start -W -n com.auraglass.app/.WidgetBoardActivity
             sleep 2
             adb shell pidof com.auraglass.app

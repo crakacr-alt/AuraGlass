@@ -258,6 +258,11 @@ public final class SetupActivity extends Activity {
         addButton(backups,"Восстановить настройки из JSON",()->
             SettingsBackup.importFromFile(this));
 
+        LinearLayout diagnostics=section(main,"07 · Диагностика устройства",
+            "Проверка Home, обоев, разрешений, дисплея и времени кадров без отправки данных.");
+        addButton(diagnostics,"Открыть диагностику AURA",()->
+            startActivity(new Intent(this,DiagnosticsActivity.class)));
+
         gap(main, 20);
         TextView note = title("Тестовая версия. Системная шторка и экран блокировки остаются под управлением One UI.", 11, false);
         note.setTextColor(0xffc7bfd6);
