@@ -1,52 +1,53 @@
-# AURA GLASS · Android Launcher & Live Atmosphere
+# AURA GLASS — Android launcher, live glass & weather
 
-Native Android prototype for an adaptive Samsung-friendly launcher, animated wallpapers, glass editor and weather.
+**Status: active development, not a stable release.** This repository contains the Android application source and reproducible development builds. The `v0.x-alpha` prereleases are obsolete; their GitHub Actions debug certificates changed between builds, so updating them on top of each other may fail with "App not installed". A stable, permanently signed release has **not** been published.
 
-## v0.2.2 alpha — installation and activation
+## Core components
 
-The **app icon opens a dedicated setup screen** with separate controls and status indicators for the launcher and live wallpaper. No root or system modifications are involved.
+| Component | Current implementation | What is not finished |
+|---|---|---|
+| AURA Home | Launcher HOME role, weather card, app list/search, favorites, editable dock, persistent folders, integrated access to a widget board | True multi-page drag-and-drop home grid, full backup/restore of live widget bindings, Samsung visual acceptance |
+| Widgets | Android `AppWidgetHost` workspace with system binding, provider configuration, widget height/order and removal | Native resizable widget placement directly on multiple launcher pages |
+| ICE GLASS | Live wallpaper, thermal frost trails, condensation/refreezing, snow, aurora, stars, galaxy, comets, moon phase, full-screen interactive preview | GPU optical refraction, final crystalline detail, measured performance and visual match on S24 Ultra |
+| AURA Island | Launcher capsule, MediaSession track/artist/transport/seek, opt-in FFT, notification cards, call-notification actions, system audio streams | Across-app overlay, advanced OEM call support, real per-app volume without supported Samsung API |
+| Updates | GitHub stable-release check **on opening Setup only**, opt-in notification, explicit download and package/hash/signature/version checks, Android installation confirmation | End-to-end stable→stable upgrade test; release key and stable assets |
+| Diagnostics | On-device system status and user-initiated window FrameMetrics test, local shareable report | Long-run thermal/battery tests and full-screen wallpaper 120 Hz profiling |
+| Backup | User-controlled JSON export/import of theme, desktop shortcuts, dock and folders | Widget instance IDs are not portable and must be rebound after reinstall |
 
-1. Install the APK from [v0.2.2-alpha Releases](https://github.com/crakacr-alt/AuraGlass/releases/tag/v0.2.2-alpha).
-2. Open AURA GLASS from your application list.
-3. Choose **Сделать AURA главным экраном** and confirm Android's home app dialog.
-4. Independently choose **Установить живые обои AURA**, and select AURA Live Atmosphere in Android's system picker.
-5. Leave your wallpaper unchanged if you want. Enter **Редактор** to adjust weather, time-of-day, opacity, effect strength and rendering rate.
-6. Choose **Вернуть One UI Home** to open Android's Home default settings; choose the original Samsung launcher.
-7. To return to previous wallpaper, use Samsung **Обои и стиль**; the wallpaper is not silently backed up or restored.
+## Android setup
 
-> The v0.1 alpha was merely a working compile and lacked a proper first-run activation experience. Please **uninstall that test version** before trying v0.2: GitHub runners generate different debug-signing keys.
+Installing an existing development artifact is for testing, not for use as a production launcher. Android 8.0+ (`minSdk=26`) is the current compatibility target; ARMv7 and arm64 code is built without native ABI-specific libraries, but physical compatibility is not yet verified.
 
-## AURA Island — development implementation
+After install, open AURA GLASS from the app list. The setup screen lets you **independently** select AURA as the default Home application (Android Home role) and apply AURA live wallpaper (Android system preview). Neither action occurs silently. You can always switch the Home app back to Samsung One UI Home under **Settings → Apps → Default apps → Home app**, and separately restore a wallpaper via Samsung Wallpaper and style.
 
-The development branch now includes the first **real media/event integration**:
+Use the editor to choose ICE GLASS, weather, time, effects and refresh rate. Select **System / 60 FPS / 120 FPS**; 120 Hz is a request only if supported by the display, not a claim of sustained 120 FPS. Energy saver/thermal throttling may lower frame rates.
 
-- Compact glass capsule on **AURA Home**; tap or swipe to expand/collapse, long-press for configuration
-- Real media title, artist, source app, artwork, playback state, seek bar, previous/pause/next where supported by the source MediaSession
-- Optional FFT audio-reactive spectrum through Android's `Visualizer(0)` when the user explicitly grants `RECORD_AUDIO`. Without capture there is a calm stationary waveform — not simulated bass
-- Call notifications where the phone app exposes them: caller label and optional details (hidden by default), notification-provided actions only; opening the system phone call UI
-- Actual five-channel AudioManager system volume mixer; **not** a universal per-app sound mixer. Samsung SoundAssistant can be opened when available
-- Local `NotificationListenerService` consent; no notification content or FFT bytes sent to servers
-- Currently limited to AURA Home. Other-app overlay, independent per-app audio and true direct call mute/hang-up require separate OEM/system support or a default-dialer implementation and are **not promised or enabled**
+From AURA Home, tap the widget icon to open the Android widget board. Long-press app icons to manage favorites, dock and folders. From Setup, use **Save settings to JSON** before uninstalling a test build; import them after reinstalling. Widgets supplied by other apps still require Android's binding/permissions.
 
-The GitHub Actions pipeline builds and smoke-tests the development APK **without publishing a public prerelease**. A stable release requires a persistent private signing key and real testing on Samsung before publication. See [RELEASE_PLAN.md](RELEASE_PLAN.md), [SIGNING.md](SIGNING.md), and [AURA_ISLAND_SPEC.md](AURA_ISLAND_SPEC.md).
+## Updates and security
 
-## Prototype capabilities
+- Stable releases are discovered from `https://api.github.com/repos/crakacr-alt/AuraGlass/releases/latest` **only on SetupActivity entry or when you press Check now**.
+- If a newer stable APK is available, AURA offers a download button. Optionally an update notice appears in the notification shade once per release. There is no scheduled or silent update.
+- Download verification checks the GitHub asset digest, APK size, package ID, signing certificate, and increasing version code. Android still displays its own installation consent.
+- Until one persistent private signing key exists, previous debug builds **cannot be guaranteed to upgrade without uninstalling**.
+- Android notification listener, audio spectrum, location and install-from-source permissions are requested only for their corresponding opt-in features.
 
-- Native home screen with app drawer, installed apps and animated weather card
-- Live-wallpaper service with gradients, sun/moon, stars, rain, snow, frost, mist, aurora
-- Gradual daylight changes and weather crossfades
-- Manual weather mode or Open-Meteo city weather, approximate geolocation permission when opted in
-- Android weather widget with static RemoteViews snapshots; frame-by-frame animation is only in AURA Home
-- Samsung Weather opening where a compatible activity is available
-- AURA setup state diagnostics and easy system-based reversal
-- No native dependencies: Android 8.0+; ARMv7 and ARM64 supported if device supports API 26+
+## Tests and release gate
 
-## Quality and limitations
+GitHub Actions compiles, validates manifest declarations and APK signatures, installs the development APK in an API 35 emulator, exercises onboarding, Home, widget board, diagnostics, editor, ICE GLASS and the wallpaper picker, and uploads screenshots/logs. A passing emulator test does **not** prove compatibility with physical Samsung One UI, true 120 FPS, smooth touch rendering or stable upgrade signing.
 
-This is **not yet a visually complete recreation of the concept renders**. Visual fidelity, blur/refraction, weather realism, smooth gestures and real Samsung compatibility need substantial development and device verification. The launcher currently has a basic application grid rather than a full One UI replacement (folders, drag/drop and editable desktop not yet implemented).
+A stable `v1.0` release must meet **every mandatory acceptance item** in:
+- [100% engineering roadmap](RELEASE_100_ROADMAP.md)
+- [Release checklist](RELEASE_PLAN.md)
+- [ICE GLASS rendering spec](ICE_GLASS_SPEC.md) and [visual QA](ICE_VISUAL_QA.md)
+- [AURA Island spec](AURA_ISLAND_SPEC.md)
+- [GitHub updater spec](GITHUB_UPDATES.md)
+- [Signing and migration notes](SIGNING.md)
 
-CI builds the APK, validates its HOME and live-wallpaper manifest entries, runs Setup/Home/Editor, opens live wallpaper preview, checks HOME role selection on an Android emulator, and saves screenshots as GitHub Actions artifacts. Emulator success does not guarantee Samsung behavior. No invasive overlay permissions or system modifications are used. Render loops only run while visible; battery saver reduces updates.
+No automatic GitHub Releases are created from development commits. The existing old prereleases are not promoted to stable releases.
 
 ## Build
 
-Open in Android Studio using JDK 17 / Gradle 8.10.2, or use GitHub Actions. Source project is Java 17, Android Gradle Plugin 8.7.3, compileSdk 35.
+JDK 17 / Gradle 8.10.2 / Android Gradle Plugin 8.7.3 / compileSdk 35. Run `gradle --no-daemon :app:assembleDebug`, or inspect the latest GitHub Actions workflow and its artifacts. Development APK signatures may vary between Actions runners.
+
+© AURA GLASS — development prototype.
