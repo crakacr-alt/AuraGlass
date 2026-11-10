@@ -43,12 +43,12 @@ jobs:
           grep -q "android.intent.category.HOME" /tmp/manifest.txt
           grep -q "android.service.wallpaper.WallpaperService" /tmp/manifest.txt
           echo "✓ Setup activity, HOME role and live-wallpaper service all registered"
-          cp "$APK" AuraGlass-v0.2-alpha.apk
-          sha256sum AuraGlass-v0.2-alpha.apk
+          cp "$APK" AuraGlass-v0.2.1-alpha.apk
+          sha256sum AuraGlass-v0.2.1-alpha.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: AuraGlass-v0.2-alpha-apk
-          path: AuraGlass-v0.2-alpha.apk
+          name: AuraGlass-v0.2.1-alpha-apk
+          path: AuraGlass-v0.2.1-alpha.apk
           if-no-files-found: error
 
   smoke:
@@ -59,7 +59,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          name: AuraGlass-v0.2-alpha-apk
+          name: AuraGlass-v0.2.1-alpha-apk
       - name: Allow KVM acceleration
         run: |
           if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi
@@ -72,13 +72,13 @@ jobs:
           script: |
             set -eu
             mkdir -p screenshots
-            adb install -r AuraGlass-v0.2-alpha.apk
+            adb install -r AuraGlass-v0.2.1-alpha.apk
             adb logcat -c
+            adb shell am force-stop com.android.launcher3 || true
             adb shell am start -W -n com.auraglass.app/.SetupActivity
             sleep 3
             adb shell pidof com.auraglass.app
             adb exec-out screencap -p > screenshots/01-setup.png
-            adb shell cmd role add-role-holder android.app.role.HOME com.auraglass.app || true
             adb shell am start -W -n com.auraglass.app/.HomeActivity
             sleep 3
             adb shell pidof com.auraglass.app
@@ -86,16 +86,22 @@ jobs:
             adb shell am start -W -n com.auraglass.app/.MainActivity
             sleep 2
             adb exec-out screencap -p > screenshots/03-editor.png
+            adb shell am start -W -a android.service.wallpaper.CHANGE_LIVE_WALLPAPER --ecn android.service.wallpaper.extra.LIVE_WALLPAPER_COMPONENT com.auraglass.app/.AuraWallpaperService
+            sleep 3
+            adb exec-out screencap -p > screenshots/04-wallpaper-preview.png
+            adb shell cmd role add-role-holder android.app.role.HOME com.auraglass.app
+            adb shell cmd role get-role-holders android.app.role.HOME > screenshots/home-role.txt
             adb shell dumpsys package com.auraglass.app > screenshots/installed-package.txt
             grep -q "AuraWallpaperService" screenshots/installed-package.txt
             grep -q "HomeActivity" screenshots/installed-package.txt
+            grep -q "com.auraglass.app" screenshots/home-role.txt
             ! adb logcat -d -s AndroidRuntime:E | grep -F "Process: com.auraglass.app"
             echo "✓ Setup, home and editor open; wallpaper service registered"
       - name: Save emulator evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: AuraGlass-v0.2-emulator-screenshots
+          name: AuraGlass-v0.2.1-emulator-screenshots
           path: screenshots/
           if-no-files-found: warn
 
@@ -109,14 +115,14 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: AuraGlass-v0.2-alpha-apk
+          name: AuraGlass-v0.2.1-alpha-apk
       - name: Release APK
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
-          gh release create v0.2-alpha AuraGlass-v0.2-alpha.apk \
+          gh release create v0.2.1-alpha AuraGlass-v0.2.1-alpha.apk \
             --target "${GITHUB_SHA}" \
-            --title "AURA GLASS v0.2 Alpha · Activation Fix" \
+            --title "AURA GLASS v0.2.1 Alpha · Activation + Wallpaper Tests" \
             --notes "Early Android test build. Includes a clear first-run launcher/live-wallpaper setup, Home default-role flow, Samsung-compatible wallpaper chooser, setup status checks, and editor. Build and Android emulator smoke tests passed. IMPORTANT: this does not establish compatibility with a physical Samsung S24 Ultra or guarantee visual parity with the mockups. Uninstall v0.1 alpha before installing: CI debug signing keys differ between runs." \
             --prerelease

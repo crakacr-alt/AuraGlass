@@ -101,6 +101,17 @@ public final class SetupActivity extends Activity {
         preview = new AtmospherePreviewView(this);
         main.addView(preview, new LinearLayout.LayoutParams(-1, dp(225)));
         gap(main, 14);
+        LinearLayout quick = new LinearLayout(this);
+        quick.setOrientation(LinearLayout.HORIZONTAL);
+        Button quickHome = action("Включить лаунчер", () -> Activation.requestHome(this));
+        Button quickWallpaper = action("Живые обои", () -> Activation.requestWallpaper(this));
+        LinearLayout.LayoutParams left = new LinearLayout.LayoutParams(0, dp(56), 1);
+        LinearLayout.LayoutParams right = new LinearLayout.LayoutParams(0, dp(56), 1);
+        right.leftMargin = dp(9);
+        quick.addView(quickHome, left);
+        quick.addView(quickWallpaper, right);
+        main.addView(quick, new LinearLayout.LayoutParams(-1, dp(56)));
+        gap(main, 14);
         subtitle = title("Выберите, что применять. Ваши системные обои сохранятся до подтверждения замены.", 13, false);
         subtitle.setTextColor(0xffe4deef);
         main.addView(subtitle);
