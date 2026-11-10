@@ -53,7 +53,7 @@ public final class GlassPanel extends FrameLayout {
                 if(ice==null)ice=new IceGlassLayer();
                 ice.configure(Config.number(getContext(),"frost_strength",.92f),
                     Config.number(getContext(),"frost_recovery",1f),
-                    Config.number(getContext(),"touch_radius",.057f),true,
+                    Config.number(getContext(),"touch_radius",.035f),true,
                     Config.bool(getContext(),"reduce_motion",false));
                 ice.startStroke(pressedX,pressedY,getWidth(),getHeight(),now);
                 lastWarmAt=now;

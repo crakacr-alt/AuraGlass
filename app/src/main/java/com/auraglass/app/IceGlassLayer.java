@@ -15,8 +15,8 @@ import java.util.Random;
  * No full-screen per-frame allocations and no continuous background threads.
  */
 public final class IceGlassLayer {
-    private static final int WIDTH=160;
-    private static final int HEIGHT=320;
+    private static final int WIDTH=240;
+    private static final int HEIGHT=512;
     private static final int COUNT=WIDTH*HEIGHT;
     private static final int REBUILD_MS=80;
     private final Paint bitmapPaint=new Paint(Paint.ANTI_ALIAS_FLAG|Paint.FILTER_BITMAP_FLAG);
@@ -38,7 +38,7 @@ public final class IceGlassLayer {
     private float lastStrength=-1;
     private float intensity=0.7f;
     private float recovery=1.0f;
-    private float touchRadius=0.055f;
+    private float touchRadius=0.035f;
     private boolean interaction=true;
     private boolean reducedMotion=false;
     private float previousX=-1,previousY=-1;
@@ -57,7 +57,7 @@ public final class IceGlassLayer {
     public void configure(float intensity,float recovery,float radius,boolean interaction,boolean reduced){
         this.intensity=Math.max(0,Math.min(1,intensity));
         this.recovery=Math.max(.4f,Math.min(2.6f,recovery));
-        this.touchRadius=Math.max(.025f,Math.min(.12f,radius));
+        this.touchRadius=Math.max(.018f,Math.min(.085f,radius));
         this.interaction=interaction;
         this.reducedMotion=reduced;
         lastBitmap=0;
@@ -122,7 +122,7 @@ public final class IceGlassLayer {
                 else if(edge==2){x=lane*(WIDTH-1);y=1;theta=(float)Math.PI/2;}
                 else{x=lane*(WIDTH-1);y=HEIGHT-2;theta=-(float)Math.PI/2;}
                 theta+=(rng.nextFloat()-.5f)*.68f;
-                growBranch(x,y,theta,1.7f+rng.nextFloat()*.75f,19+rng.nextInt(18),0);
+                growBranch(x,y,theta,1.6f+rng.nextFloat()*.7f,21+rng.nextInt(17),0);
             }
         }
     }
@@ -226,14 +226,16 @@ public final class IceGlassLayer {
                 float warmth=heat[i];
                 // Finger heat melts crystalline lattice first; a little moist
                 // condensation remains instead of a solid black marker stroke.
-                float mist=baseMist*moisture*(1f-.23f*warmth);
-                float ice=dendrite*frozen*(1f-.90f*warmth);
+                // Never erase the entire glass film into a black-looking stroke.
+                // A thin wet haze stays visible while the frozen lattice melts.
+                float mist=baseMist*(.50f+.50f*moisture)*(1f-.15f*warmth);
+                float ice=dendrite*(.05f+.95f*frozen)*(1f-.80f*warmth);
                 float sparkle=(grain[i]>.982f?crystal[i]*.12f*frozen:0)*(1f-warmth);
                 float opacity=(mist+ice+sparkle)*strength;
                 // Soft contact-pressure falloff: no hard-edged black marker stroke.
                 if(age<1.3f){
                     float warmOpacity=(1f-fade(.12f,1.3f,age))*meltDepth[i];
-                    opacity*=1f-.48f*warmOpacity;
+                    opacity*=1f-.25f*warmOpacity;
                 }
                 opacity=Math.max(0,Math.min(.55f,opacity));
                 int alpha=(int)(opacity*255);
@@ -276,8 +278,8 @@ public final class IceGlassLayer {
             sparklePaint.setStrokeWidth(Math.max(1,width*.0012f));
             sparklePaint.setStrokeCap(Paint.Cap.ROUND);
             for(int k=0;k<9;k++){
-                float x=((k*47+23)%157)/160f*width;
-                float y=((k*79+11)%311)/320f*height;
+                float x=((k*47+23)%233)/240f*width;
+                float y=((k*79+11)%503)/512f*height;
                 int index=Math.min(COUNT-1,
                     (int)(y/height*(HEIGHT-1))*WIDTH+(int)(x/width*(WIDTH-1)));
                 if(crystal[index]<.4f||heat[index]>.18f)continue;

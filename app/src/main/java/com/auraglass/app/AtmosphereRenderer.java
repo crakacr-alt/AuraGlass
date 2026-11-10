@@ -62,7 +62,7 @@ public final class AtmosphereRenderer {
         climateBoost=ClimateGlass.frostBoost(climate,manual);
         iceGlass.configure(Config.number(ctx,"frost_strength",.92f),
             Config.number(ctx,"frost_recovery",1f)*ClimateGlass.recoveryMultiplier(climate,manual),
-            Config.number(ctx,"touch_radius",.057f),
+            Config.number(ctx,"touch_radius",.035f),
             Config.bool(ctx,"touch_melt",true),reduceMotion);
         weatherCode=climate.code;
         String next=actualWeather();

@@ -158,7 +158,7 @@ public final class MainActivity extends Activity {
         setting(iceControls,"Запотевание обычного стекла","glass_touch",true);
         slider(iceControls,"Интенсивность инея","frost_strength",.92f);
         scaledSlider(iceControls,"Восстановление морозного рисунка","frost_recovery",1f,.4f,2.6f);
-        scaledSlider(iceControls,"Радиус следа пальца","touch_radius",.057f,.025f,.12f);
+        scaledSlider(iceControls,"Радиус следа пальца","touch_radius",.035f,.018f,.085f);
 
         section(content,"Производительность","Качество будет снижаться автоматически при нагреве или энергосбережении.");
         LinearLayout perf=surface();
