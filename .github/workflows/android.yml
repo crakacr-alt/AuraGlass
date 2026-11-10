@@ -85,23 +85,28 @@ jobs:
             adb exec-out screencap -p > screenshots/01-setup.png
             # Access internal, non-exported activities through actual app buttons,
             # not from the ADB shell UID, preserving Android component isolation.
-            adb shell input tap 900 125
-            sleep 2
+            adb shell uiautomator dump /sdcard/aura_setup.xml >/dev/null
+            adb pull /sdcard/aura_setup.xml screenshots/setup-ui.xml >/dev/null
+            python3 .github/scripts/tap_accessibility.py screenshots/setup-ui.xml 'Тест'
+            sleep 3
             adb shell pidof com.auraglass.app
+            adb logcat -d -s AndroidRuntime:E > screenshots/diagnostics-runtime.txt
             adb shell dumpsys activity activities > screenshots/diagnostics-stack.txt
-            grep -q 'DiagnosticsActivity' screenshots/diagnostics-stack.txt
             adb exec-out screencap -p > screenshots/11-diagnostics.png
+            grep -q 'DiagnosticsActivity' screenshots/diagnostics-stack.txt
             adb shell input keyevent 4
             sleep 1
             adb shell am start -W -n com.auraglass.app/.HomeActivity
             sleep 3
-            # Pixel 6 emulator: the widgets button sits in the Home header.
-            adb shell input tap 840 381
-            sleep 2
+            adb shell uiautomator dump /sdcard/aura_home.xml >/dev/null
+            adb pull /sdcard/aura_home.xml screenshots/home-ui.xml >/dev/null
+            python3 .github/scripts/tap_accessibility.py screenshots/home-ui.xml 'Открыть страницу виджетов AURA'
+            sleep 3
             adb shell pidof com.auraglass.app
+            adb logcat -d -s AndroidRuntime:E > screenshots/widget-runtime.txt
             adb shell dumpsys activity activities > screenshots/widget-board-stack.txt
-            grep -q 'WidgetBoardActivity' screenshots/widget-board-stack.txt
             adb exec-out screencap -p > screenshots/10-widget-board.png
+            grep -q 'WidgetBoardActivity' screenshots/widget-board-stack.txt
             adb shell input keyevent 4
             sleep 1
             adb shell am start -W -n com.auraglass.app/.HomeActivity
