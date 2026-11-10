@@ -173,7 +173,8 @@ public final class IceGlassLayer {
                 heat[i]=Math.max(heat[i],Math.min(1f,.37f+deposit*.87f));
                 if(d<.92f){
                     touchedAt[i]=now;
-                    meltDepth[i]=Math.max(.1f,1-d*.8f);
+                    float contact=Math.max(0,1-d/.93f);
+                    meltDepth[i]=contact*contact;
                 }
             }
         }
@@ -227,7 +228,11 @@ public final class IceGlassLayer {
                 float ice=dendrite*frozen;
                 float sparkle=grain[i]>.982f?crystal[i]*.12f*frozen:0;
                 float opacity=(mist+ice+sparkle)*heatClear*strength;
-                if(age<1.15f)opacity*=.04f+.96f*fade(.26f,1.15f,age);
+                // Soft contact-pressure falloff: no hard-edged black marker stroke.
+                if(age<1.3f){
+                    float warmOpacity=(1f-fade(.12f,1.3f,age))*meltDepth[i];
+                    opacity*=1f-.94f*warmOpacity;
+                }
                 opacity=Math.max(0,Math.min(.55f,opacity));
                 int alpha=(int)(opacity*255);
                 // Cooler crystal highlights; subtle translucent condensation grains.
