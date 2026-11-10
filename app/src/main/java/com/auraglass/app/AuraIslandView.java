@@ -93,7 +93,7 @@ public final class AuraIslandView extends FrameLayout {
     }
     private GradientDrawable capsuleBackground(){
         GradientDrawable shape=new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-            new int[]{0xed222b42,0xef35324d,0xe8293a4a});
+            new int[]{0xf9222b42,0xf935324d,0xf9293a4a});
         shape.setCornerRadius(dp(28));
         shape.setStroke(dp(1),0xb3d7d7f9);
         return shape;
@@ -344,23 +344,33 @@ public final class AuraIslandView extends FrameLayout {
         setContentDescription(yes?"AURA Island. Свайп вверх чтобы свернуть.":
             "AURA Island. Нажмите для раскрытия.");
     }
+    private int targetWidth(){
+        int screen=getResources().getDisplayMetrics().widthPixels;
+        return expanded?Math.min(screen-dp(22),dp(390)):
+            Math.min(screen-dp(62),dp(258));
+    }
     private void animateHeight(int target,boolean animate){
         ViewGroup.LayoutParams params=getLayoutParams();
         if(params==null)return;
         int from=getHeight()>0?getHeight():dp(COLLAPSED);
+        int fromWidth=getWidth()>0?getWidth():Math.min(
+            getResources().getDisplayMetrics().widthPixels-dp(62),dp(258));
+        int endWidth=targetWidth();
         if(!animate||Config.bool(host,"reduce_motion",false)){
-            params.height=target;setLayoutParams(params);
+            params.height=target;params.width=endWidth;setLayoutParams(params);
             detail.setAlpha(expanded?1:0);
             detail.setVisibility(expanded?VISIBLE:GONE);
             return;
         }
         sizeAnimation=ValueAnimator.ofInt(from,target);
-        sizeAnimation.setDuration(expanded?350:265);
+        sizeAnimation.setDuration(expanded?360:290);
         sizeAnimation.setInterpolator(new PathInterpolator(.21f,.82f,.18f,1));
         sizeAnimation.addUpdateListener(animation->{
             ViewGroup.LayoutParams lp=getLayoutParams();
             if(lp==null)return;
-            lp.height=(int)animation.getAnimatedValue();setLayoutParams(lp);
+            lp.height=(int)animation.getAnimatedValue();
+            lp.width=(int)(fromWidth+(endWidth-fromWidth)*animation.getAnimatedFraction());
+            setLayoutParams(lp);
             float progress=(lp.height-dp(COLLAPSED))/(float)Math.max(1,dp(targetHeight()-COLLAPSED));
             detail.setAlpha(Math.max(0,Math.min(1,progress)));
         });

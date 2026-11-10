@@ -226,8 +226,10 @@ public final class HomeActivity extends Activity {
         vertical.addView(dock,new LinearLayout.LayoutParams(-1,dp(80)));
         if(Config.bool(this,"island_enabled",true)){
             island=new AuraIslandView(this);
-            FrameLayout.LayoutParams islandLp=new FrameLayout.LayoutParams(-1,dp(57),Gravity.TOP|Gravity.CENTER_HORIZONTAL);
-            islandLp.leftMargin=dp(39);islandLp.rightMargin=dp(39);islandLp.topMargin=dp(34);
+            int collapsedWidth=Math.min(getResources().getDisplayMetrics().widthPixels-dp(62),dp(258));
+            FrameLayout.LayoutParams islandLp=new FrameLayout.LayoutParams(collapsedWidth,dp(57),
+                Gravity.TOP|Gravity.CENTER_HORIZONTAL);
+            islandLp.topMargin=dp(34);
             root.addView(island,islandLp);
             island.setOnApplyWindowInsetsListener((v,insets)->{
                 FrameLayout.LayoutParams lp=(FrameLayout.LayoutParams)v.getLayoutParams();
