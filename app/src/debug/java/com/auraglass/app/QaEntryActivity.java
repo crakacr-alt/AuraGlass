@@ -10,6 +10,8 @@ import android.os.Bundle;
  * debug APKs ONLY; this component is absent from release builds.
  */
 public final class QaEntryActivity extends Activity {
+    private static final int WIDGET_REQUEST=9024;
+    private int pendingWidgetId=-1;
     @Override protected void onCreate(Bundle state){
         super.onCreate(state);
         if((getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE)==0){
@@ -88,34 +90,33 @@ public final class QaEntryActivity extends Activity {
             finish();return;
         }
         if("widget_bind".equals(target)){
-            int widgetId=-1;
-            boolean bound=false;
             try{
                 android.appwidget.AppWidgetHost appHost=
                     new android.appwidget.AppWidgetHost(this,70901);
-                widgetId=appHost.allocateAppWidgetId();
+                pendingWidgetId=appHost.allocateAppWidgetId();
                 android.appwidget.AppWidgetManager manager=
                     android.appwidget.AppWidgetManager.getInstance(this);
                 android.content.ComponentName provider=
                     new android.content.ComponentName(this,WeatherWidgetProvider.class);
-                bound=manager.bindAppWidgetIdIfAllowed(widgetId,provider);
-                bound=bound&&manager.getAppWidgetInfo(widgetId)!=null;
-                if(bound){
-                    String previous=Config.str(this,"widget_board_ids","");
-                    Config.put(this,"widget_board_ids",
-                        previous.isEmpty()?String.valueOf(widgetId):previous+","+widgetId);
-                    Config.put(this,"widget_page_"+widgetId,0f);
-                    WeatherWidgetProvider.updateAll(this);
-                    startActivity(new Intent(this,HomeActivity.class));
+                if(manager.bindAppWidgetIdIfAllowed(pendingWidgetId,provider)){
+                    finishWidgetBinding();
                 }else{
-                    appHost.deleteAppWidgetId(widgetId);
+                    android.util.Log.i("AURA_QA","WIDGET_PERMISSION_REQUESTED");
+                    Intent request=new Intent(
+                        android.appwidget.AppWidgetManager.ACTION_APPWIDGET_BIND);
+                    request.putExtra(
+                        android.appwidget.AppWidgetManager.EXTRA_APPWIDGET_ID,pendingWidgetId);
+                    request.putExtra(
+                        android.appwidget.AppWidgetManager.EXTRA_APPWIDGET_PROVIDER,provider);
+                    startActivityForResult(request,WIDGET_REQUEST);
                 }
             }catch(Exception e){
                 android.util.Log.e("AURA_QA","WIDGET_BIND_EXCEPTION",e);
-                bound=false;
+                cleanWidgetBinding();
+                android.util.Log.i("AURA_QA","WIDGET_BIND_FAILED");
+                finish();
             }
-            android.util.Log.i("AURA_QA",bound?"WIDGET_BIND_OK":"WIDGET_BIND_FAILED");
-            finish();return;
+            return;
         }
         if("diagnostics".equals(target))page=DiagnosticsActivity.class;
         else if("widgets".equals(target))page=WidgetBoardActivity.class;
@@ -123,5 +124,47 @@ public final class QaEntryActivity extends Activity {
         else if("editor".equals(target))page=MainActivity.class;
         if(page!=null)startActivity(new Intent(this,page));
         finish();
+    }
+    private void cleanWidgetBinding(){
+        if(pendingWidgetId>0){
+            try{new android.appwidget.AppWidgetHost(this,70901)
+                .deleteAppWidgetId(pendingWidgetId);}
+            catch(RuntimeException ignored){}
+            pendingWidgetId=-1;
+        }
+    }
+    private void finishWidgetBinding(){
+        try{
+            android.appwidget.AppWidgetManager manager=
+                android.appwidget.AppWidgetManager.getInstance(this);
+            if(pendingWidgetId<=0||manager.getAppWidgetInfo(pendingWidgetId)==null)
+                throw new IllegalStateException("Widget not bound");
+            String previous=Config.str(this,"widget_board_ids","");
+            String item=String.valueOf(pendingWidgetId);
+            Config.put(this,"widget_board_ids",
+                previous.isEmpty()?item:previous+","+item);
+            Config.put(this,"widget_page_"+pendingWidgetId,0f);
+            WeatherWidgetProvider.updateAll(this);
+            android.util.Log.i("AURA_QA","WIDGET_BIND_OK");
+            startActivity(new Intent(this,HomeActivity.class));
+        }catch(Exception e){
+            android.util.Log.e("AURA_QA","WIDGET_BIND_EXCEPTION",e);
+            android.util.Log.i("AURA_QA","WIDGET_BIND_FAILED");
+            cleanWidgetBinding();
+        }
+        finish();
+    }
+    @Override protected void onActivityResult(int request,int result,Intent data){
+        super.onActivityResult(request,result,data);
+        if(request!=WIDGET_REQUEST)return;
+        if(result==RESULT_OK){
+            if(data!=null)
+                pendingWidgetId=data.getIntExtra(
+                    android.appwidget.AppWidgetManager.EXTRA_APPWIDGET_ID,pendingWidgetId);
+            finishWidgetBinding();
+        }else{
+            android.util.Log.i("AURA_QA","WIDGET_BIND_DECLINED");
+            cleanWidgetBinding();finish();
+        }
     }
 }
