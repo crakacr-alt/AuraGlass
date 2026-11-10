@@ -142,7 +142,9 @@ public final class SettingsBackup {
                             replacement.putLong(key,(long)number);
                         else replacement.putFloat(key,(float)number);
                         count++;
-                    }else if(value instanceof String && ((String)value).length()<=8192){
+                    }else if(value instanceof String &&
+                             ((String)value).length()<=
+                             ("home_folders".equals(key)?MAX_FILE_BYTES:8192)){
                         if(previous==null||previous instanceof String){
                             replacement.putString(key,(String)value);count++;
                         }
@@ -155,7 +157,8 @@ public final class SettingsBackup {
                         .setTitle("Восстановить настройки AURA?")
                         .setMessage("Из файла будет импортировано "+finalCount+
                             " параметров. Текущие значения этих параметров изменятся. "+
-                            "Системный лаунчер и обои автоматически не переключаются.")
+                            "Системный лаунчер и обои автоматически не переключаются. "+
+                            "Виджеты сторонних приложений нужно будет привязать заново.")
                         .setNegativeButton("Отмена",null)
                         .setPositiveButton("Восстановить",(dialog,which)->{
                             replacement.apply();
