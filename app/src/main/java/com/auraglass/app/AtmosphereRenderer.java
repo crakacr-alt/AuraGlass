@@ -1,6 +1,7 @@
 package com.auraglass.app;
 
 import android.content.Context;
+import android.os.SystemClock;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.LinearGradient;
@@ -19,6 +20,10 @@ public final class AtmosphereRenderer {
     private float intensity=.58f,speed=.65f;
     private boolean aurora=true,stars=true,reduceMotion=false;
     private int weatherCode=0;
+    private String previousWeather=null;
+    private long weatherChangeAt=0;
+    private float animatedHour=Float.NaN;
+    private long previousFrameAt=0;
     public AtmosphereRenderer(){
         Random random=new Random(570319);
         for(int i=0;i<rx.length;i++){
@@ -27,6 +32,7 @@ public final class AtmosphereRenderer {
         }
     }
     public void reload(Context ctx){
+        String old=actualWeather();
         mode=Config.str(ctx,"weather_mode","auto");
         period=Config.str(ctx,"time_mode","auto");
         intensity=Config.number(ctx,"intensity",.58f);
@@ -35,6 +41,14 @@ public final class AtmosphereRenderer {
         stars=Config.bool(ctx,"stars",true);
         reduceMotion=Config.bool(ctx,"reduce_motion",false);
         weatherCode=WeatherRepository.read(ctx).code;
+        String next=actualWeather();
+        if(!old.equals(next)){
+            previousWeather=old;
+            weatherChangeAt=SystemClock.uptimeMillis();
+        }
+    }
+    private float effectPower(String current,String previous,String key,float mix){
+        return (current.equals(key)?mix:0f)+(previous.equals(key)?1f-mix:0f);
     }
     private int alpha(int color,int a){return (color&0x00ffffff)|(Math.max(0,Math.min(a,255))<<24);}
     private int blend(int a,int b,float t){
@@ -67,14 +81,28 @@ public final class AtmosphereRenderer {
         if(width<=0||height<=0)return;
         float w=width,h=height;
         float t=ms/1000f*speed;
-        float hr=hour();
+        float targetHour=hour();
+        if(Float.isNaN(animatedHour))animatedHour=targetHour;
+        if(previousFrameAt==0)previousFrameAt=ms;
+        float dt=Math.max(0,Math.min(150,ms-previousFrameAt));
+        previousFrameAt=ms;
+        float hourDifference=((targetHour-animatedHour+36f)%24f)-12f;
+        animatedHour=(animatedHour+hourDifference*(1f-(float)Math.exp(-dt/1800f))+24f)%24f;
+        float hr=animatedHour;
         float daylight=smooth(5.2f,9f,hr)*(1f-smooth(17.3f,21.6f,hr));
         float twilight=smooth(15.5f,18.1f,hr)*(1-smooth(20.1f,22.0f,hr));
         String weather=actualWeather();
-        boolean rain="rain".equals(weather)||"storm".equals(weather);
-        boolean ice="ice".equals(weather)||"snow".equals(weather);
-        boolean snow="snow".equals(weather)||"ice".equals(weather);
-        boolean fog="fog".equals(weather);
+        float mix=previousWeather==null?1:smooth(0,1,(ms-weatherChangeAt)/3400f);
+        String before=previousWeather==null?weather:previousWeather;
+        if(mix>=1)previousWeather=null;
+        float rainPower=effectPower(weather,before,"rain",mix)+effectPower(weather,before,"storm",mix);
+        float icePower=effectPower(weather,before,"ice",mix)+effectPower(weather,before,"snow",mix);
+        float snowPower=icePower;
+        float fogPower=effectPower(weather,before,"fog",mix);
+        boolean rain=rainPower>.005f;
+        boolean ice=icePower>.005f;
+        boolean snow=snowPower>.005f;
+        boolean fog=fogPower>.005f;
         float motion=reduceMotion?0:t;
         int top=blend(Color.rgb(13,21,50),Color.rgb(116,155,193),daylight);
         top=blend(top,Color.rgb(113,86,142),twilight*.68f);
@@ -82,8 +110,8 @@ public final class AtmosphereRenderer {
         center=blend(center,Color.rgb(220,131,157),twilight*.72f);
         int bottom=blend(Color.rgb(88,75,116),Color.rgb(225,201,204),daylight);
         bottom=blend(bottom,Color.rgb(255,169,129),twilight*.63f);
-        if(ice){top=blend(top,Color.rgb(57,103,144),.28f);bottom=blend(bottom,Color.rgb(151,194,214),.20f);}
-        if(rain){top=blend(top,Color.rgb(43,57,83),.32f);center=blend(center,Color.rgb(75,89,122),.25f);}
+        if(ice){top=blend(top,Color.rgb(57,103,144),.28f*icePower);bottom=blend(bottom,Color.rgb(151,194,214),.20f*icePower);}
+        if(rain){top=blend(top,Color.rgb(43,57,83),.32f*rainPower);center=blend(center,Color.rgb(75,89,122),.25f*rainPower);}
         p.setStyle(Paint.Style.FILL);p.setShader(new LinearGradient(0,0,w,h,
             new int[]{top,center,bottom},new float[]{0,.56f,1},Shader.TileMode.CLAMP));
         c.drawRect(0,0,w,h,p);p.setShader(null);
@@ -118,8 +146,9 @@ public final class AtmosphereRenderer {
             disk(c,moonX,moonY,Math.max(6,w*.045f),alpha(0xffe7e9ff,(int)(175*night)));
             p.setColor(alpha(top,(int)(210*night)));
             c.drawCircle(moonX+w*.013f,moonY-w*.012f,Math.max(5,w*.042f),p);
-            if(aurora&&(ice||"clear".equals(weather))&&hr>=20||aurora&&ice&&hr<=6){
-                drawAurora(c,w,h,motion,night);
+            if(aurora&&(ice||"clear".equals(weather)||"clear".equals(before))&&(hr>=20||hr<=6)){
+                float clearBlend=("clear".equals(weather)?mix:0f)+("clear".equals(before)?1f-mix:0f);
+                drawAurora(c,w,h,motion,night*Math.max(clearBlend,icePower));
             }
             if(stars&&night>.7f&&!rain){
                 float phase=motion%68;
@@ -138,10 +167,10 @@ public final class AtmosphereRenderer {
             glow(c,fx,fy,size,alpha(Color.WHITE,(int)(10+daylight*19)));
         }
         drawRidge(c,w,h,motion,daylight,twilight);
-        if(rain)drawRain(c,w,h,motion,intensity,"storm".equals(weather));
-        if(snow)drawSnow(c,w,h,motion,intensity);
-        if(ice)drawFrost(c,w,h,Math.min(1,intensity));
-        if(fog)glow(c,w*.5f,h*.77f,w*.9f,alpha(0xffe4e7fa,75));
+        if(rain)drawRain(c,w,h,motion,intensity*rainPower,"storm".equals(weather));
+        if(snow)drawSnow(c,w,h,motion,intensity*snowPower);
+        if(ice)drawFrost(c,w,h,Math.min(1,intensity*icePower));
+        if(fog)glow(c,w*.5f,h*.77f,w*.9f,alpha(0xffe4e7fa,(int)(75*fogPower)));
     }
     private void disk(Canvas c,float x,float y,float r,int color){p.setShader(null);p.setColor(color);c.drawCircle(x,y,r,p);}
     private void glow(Canvas c,float x,float y,float radius,int color){

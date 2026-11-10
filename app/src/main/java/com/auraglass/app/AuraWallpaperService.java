@@ -56,7 +56,8 @@ public final class AuraWallpaperService extends WallpaperService {
             boolean high=Config.bool(AuraWallpaperService.this,"high_fps",false);
             int ms=saver?67:(high?17:34);
             long spent=SystemClock.uptimeMillis()-start;
-            schedule(Math.max(4,ms-spent));
+            if(spent>ms)ms=Math.min(100,(int)(spent*1.75f));
+            schedule(Math.max(12,ms-spent));
         }
         @Override public void onSharedPreferenceChanged(SharedPreferences prefs,String key){
             renderer.reload(AuraWallpaperService.this);

@@ -21,9 +21,9 @@ public final class WeatherWidgetProvider extends AppWidgetProvider {
         for(int id:ids)update(c,m,id);
     }
     private static void update(Context c,AppWidgetManager m,int id){
-        Bitmap bitmap=Bitmap.createBitmap(760,310,Bitmap.Config.ARGB_8888);
+        Bitmap bitmap=Bitmap.createBitmap(600,245,Bitmap.Config.ARGB_8888);
         Canvas canvas=new Canvas(bitmap);
-        new WeatherCardPainter().draw(canvas,c,760,310,WeatherRepository.read(c),0);
+        new WeatherCardPainter().draw(canvas,c,600,245,WeatherRepository.read(c),0);
         RemoteViews v=new RemoteViews(c.getPackageName(),R.layout.widget_weather);
         v.setImageViewBitmap(R.id.widget_image,bitmap);
         Intent intent=new Intent(c,WeatherLaunchActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);

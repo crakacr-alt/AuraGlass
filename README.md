@@ -5,6 +5,7 @@ A native Android prototype for a Samsung/One UI-friendly launcher, living wallpa
 ## Current milestone: 0.1.0-alpha
 
 - Fullscreen wallpaper renderer with deterministic rain, snow, frost, mist, stars, aurora, moon/sun and atmospheric gradients
+- Smooth time-of-day color changes and 3.4-second weather-effect crossfades; frame rate adapts to power saver and slow render frames
 - Android live wallpaper service; installed only after the user's system confirmation
 - AURA Home launcher with installed apps, app drawer, search, a custom animated weather panel
 - Native in-app preview and preference controls for weather, time, effects, animation speed, opacity and FPS
