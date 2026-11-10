@@ -251,6 +251,13 @@ public final class SetupActivity extends Activity {
                 if(installUpdate!=null)installUpdate.setVisibility(ready?View.VISIBLE:View.GONE);
             }));
 
+        LinearLayout backups=section(main,"06 · Резервная копия",
+            "Экспорт и восстановление темы, настроек и ярлыков через файлы Android. "+
+            "Приватные данные уведомлений и установочные файлы не копируются.");
+        addButton(backups,"Сохранить настройки в JSON",()->SettingsBackup.export(this));
+        addButton(backups,"Восстановить настройки из JSON",()->
+            SettingsBackup.importFromFile(this));
+
         gap(main, 20);
         TextView note = title("Тестовая версия. Системная шторка и экран блокировки остаются под управлением One UI.", 11, false);
         note.setTextColor(0xffc7bfd6);
@@ -288,6 +295,12 @@ public final class SetupActivity extends Activity {
             downloadUpdate.setText("Загрузить заново");
             if(installUpdate!=null)installUpdate.setVisibility(View.GONE);
         }
+    }
+    @Override protected void onActivityResult(int requestCode,int resultCode,Intent data){
+        super.onActivityResult(requestCode,resultCode,data);
+        if(requestCode==SettingsBackup.EXPORT_REQUEST||
+           requestCode==SettingsBackup.IMPORT_REQUEST)
+            SettingsBackup.onResult(this,requestCode,resultCode,data);
     }
     @Override public void onRequestPermissionsResult(int requestCode,String[] permissions,int[] grants){
         super.onRequestPermissionsResult(requestCode,permissions,grants);
