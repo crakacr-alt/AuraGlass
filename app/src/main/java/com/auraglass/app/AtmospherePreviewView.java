@@ -37,7 +37,11 @@ public final class AtmospherePreviewView extends View {
             WeatherRepository.read(getContext()),SystemClock.uptimeMillis()/1000f);
         c.restore();
         c.restore();
-        if(running)postInvalidateDelayed(40);
+        if(running){
+            android.os.PowerManager pm=(android.os.PowerManager)getContext().getSystemService(Context.POWER_SERVICE);
+            boolean saver=pm!=null&&pm.isPowerSaveMode();
+            postInvalidateDelayed(saver?67:(Config.bool(getContext(),"high_fps",false)?17:34));
+        }
     }
     @Override protected void onAttachedToWindow(){super.onAttachedToWindow();running=true;invalidate();}
     @Override protected void onDetachedFromWindow(){running=false;super.onDetachedFromWindow();}

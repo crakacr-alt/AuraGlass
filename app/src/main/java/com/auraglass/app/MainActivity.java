@@ -96,6 +96,7 @@ public final class MainActivity extends Activity {
         slider(sliders,"Скорость движения","speed",.65f);
         slider(sliders,"Плотность стекла","glass",.67f);
         setting(sliders,"Северное сияние","aurora",true);
+        setting(sliders,"Молнии во время грозы","lightning",true);
         setting(sliders,"Звёзды и метеоры","stars",true);
         setting(sliders,"Высокая плавность (до 60 FPS)","high_fps",false);
         setting(sliders,"Уменьшить движение","reduce_motion",false);

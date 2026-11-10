@@ -18,7 +18,7 @@ public final class AtmosphereRenderer {
     private final float[] rx=new float[125],ry=new float[125],rv=new float[125],rs=new float[125];
     private String mode="auto", period="auto";
     private float intensity=.58f,speed=.65f;
-    private boolean aurora=true,stars=true,reduceMotion=false;
+    private boolean aurora=true,stars=true,lightning=true,reduceMotion=false;
     private int weatherCode=0;
     private String previousWeather=null;
     private long weatherChangeAt=0;
@@ -39,6 +39,7 @@ public final class AtmosphereRenderer {
         speed=Config.number(ctx,"speed",.65f);
         aurora=Config.bool(ctx,"aurora",true);
         stars=Config.bool(ctx,"stars",true);
+        lightning=Config.bool(ctx,"lightning",true);
         reduceMotion=Config.bool(ctx,"reduce_motion",false);
         weatherCode=WeatherRepository.read(ctx).code;
         String next=actualWeather();
@@ -167,7 +168,7 @@ public final class AtmosphereRenderer {
             glow(c,fx,fy,size,alpha(Color.WHITE,(int)(10+daylight*19)));
         }
         drawRidge(c,w,h,motion,daylight,twilight);
-        if(rain)drawRain(c,w,h,motion,intensity*rainPower,"storm".equals(weather));
+        if(rain)drawRain(c,w,h,motion,intensity*rainPower,lightning&&"storm".equals(weather));
         if(snow)drawSnow(c,w,h,motion,intensity*snowPower);
         if(ice)drawFrost(c,w,h,Math.min(1,intensity*icePower));
         if(fog)glow(c,w*.5f,h*.77f,w*.9f,alpha(0xffe4e7fa,(int)(75*fogPower)));
