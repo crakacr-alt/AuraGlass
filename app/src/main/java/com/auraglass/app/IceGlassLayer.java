@@ -223,15 +223,17 @@ public final class IceGlassLayer {
                 // Deeper melted centers recrystallize later than the cooler rim.
                 float freezeStart=2.2f+1.9f*meltDepth[i];
                 float frozen=fade(freezeStart,freezeStart+3.9f,age);
-                float heatClear=Math.max(0,1-heat[i]*.94f);
-                float mist=baseMist*moisture;
-                float ice=dendrite*frozen;
-                float sparkle=grain[i]>.982f?crystal[i]*.12f*frozen:0;
-                float opacity=(mist+ice+sparkle)*heatClear*strength;
+                float warmth=heat[i];
+                // Finger heat melts crystalline lattice first; a little moist
+                // condensation remains instead of a solid black marker stroke.
+                float mist=baseMist*moisture*(1f-.23f*warmth);
+                float ice=dendrite*frozen*(1f-.90f*warmth);
+                float sparkle=(grain[i]>.982f?crystal[i]*.12f*frozen:0)*(1f-warmth);
+                float opacity=(mist+ice+sparkle)*strength;
                 // Soft contact-pressure falloff: no hard-edged black marker stroke.
                 if(age<1.3f){
                     float warmOpacity=(1f-fade(.12f,1.3f,age))*meltDepth[i];
-                    opacity*=1f-.94f*warmOpacity;
+                    opacity*=1f-.48f*warmOpacity;
                 }
                 opacity=Math.max(0,Math.min(.55f,opacity));
                 int alpha=(int)(opacity*255);
