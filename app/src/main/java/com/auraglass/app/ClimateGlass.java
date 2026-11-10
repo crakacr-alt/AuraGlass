@@ -19,15 +19,17 @@ public final class ClimateGlass {
     }
     public static float frostBoost(WeatherRepository.Snapshot s,boolean manual){
         if(manual||!fresh(s))return 1f;
-        float humidity=clamp((s.humidity-35f)/65f);
+        float depression=s.temp-dewPoint(s.temp,s.humidity);
+        float nearSaturation=clamp((6-depression)/6f);
         float cold=clamp((4-s.temp)/20f);
-        return .55f+.65f*cold*(.52f+.48f*humidity);
+        return .55f+.72f*cold*(.38f+.62f*nearSaturation);
     }
     public static float recoveryMultiplier(WeatherRepository.Snapshot s,boolean manual){
         if(manual||!fresh(s))return 1f;
-        float humidity=clamp((s.humidity-35f)/65f);
+        float depression=s.temp-dewPoint(s.temp,s.humidity);
+        float nearSaturation=clamp((6-depression)/6f);
         float cold=clamp((2-s.temp)/17f);
-        // High humidity and cold speed up visible recondensation / growth.
-        return Math.max(.65f,Math.min(1.4f,1.28f-.33f*humidity-.24f*cold));
+        // Moist air close to dew point and cold speed up the *artistic* re-frost.
+        return Math.max(.65f,Math.min(1.4f,1.28f-.33f*nearSaturation-.24f*cold));
     }
 }

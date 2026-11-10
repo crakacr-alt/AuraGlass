@@ -34,7 +34,7 @@ import java.util.List;
 public final class MainActivity extends Activity {
     private final int TEXT=0xfff3f0ff, MUTED=0xffc2bfd7;
     private AtmospherePreviewView preview;
-    private TextView weatherStatus,activationStatus;
+    private TextView weatherStatus,activationStatus,climateStatus;
     private final List<Button> weatherButtons=new ArrayList<>(),timeButtons=new ArrayList<>();
     private EditText city;
     private int dp(float n){return (int)(getResources().getDisplayMetrics().density*n+.5f);}
@@ -147,6 +147,10 @@ public final class MainActivity extends Activity {
         setting(iceControls,"Кометы и светящиеся хвосты","comets",true);
         setting(iceControls,"Тепло пальца · рисовать по льду","touch_melt",true);
         setting(iceControls,"Сугробы по краям виджетов","snow_accumulation",true);
+        climateStatus=text("Климатические данные уточняются…",12,false);
+        climateStatus.setTextColor(0xffbed9e4);
+        add(iceControls,climateStatus,-2);
+        refreshClimateStatus();
         setting(iceControls,"Мягкий тактильный отклик","haptics",true);
         setting(iceControls,"Параллакс звёзд и сияния","parallax",false);
         scaledSlider(iceControls,"Глубина параллакса","parallax_strength",.35f,0f,.85f);
@@ -293,11 +297,23 @@ public final class MainActivity extends Activity {
         }
         safeStart(new Intent(Settings.ACTION_HOME_SETTINGS));
     }
+    private void refreshClimateStatus(){
+        if(climateStatus==null)return;
+        WeatherRepository.Snapshot weather=WeatherRepository.read(this);
+        if(!ClimateGlass.fresh(weather)){
+            climateStatus.setText("Укажи город: иней будет учитывать температуру и влажность. Сейчас работает художественный режим.");
+            return;
+        }
+        int dew=Math.round(ClimateGlass.dewPoint(weather.temp,weather.humidity));
+        climateStatus.setText("Снаружи "+weather.temp+" °C · Влажность "+weather.humidity+
+            "% · Точка росы ≈ "+dew+" °C. Это ориентир, а не температура стекла.");
+    }
     private void weatherDone(boolean ok,String msg){
         weatherStatus.setText(ok?
             WeatherRepository.read(this).city+": "+WeatherRepository.read(this).temp+"°, "+WeatherRepository.read(this).condition():
             msg);
         preview.reload();
+        refreshClimateStatus();
     }
     private void locate(){
         if(Build.VERSION.SDK_INT>=23 && checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION)!=PackageManager.PERMISSION_GRANTED){
