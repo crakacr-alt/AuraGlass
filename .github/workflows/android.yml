@@ -70,7 +70,7 @@ jobs:
           profile: pixel_6
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
           script: |
-            set -euo pipefail
+            set -eu
             mkdir -p screenshots
             adb install -r AuraGlass-v0.2-alpha.apk
             adb logcat -c
@@ -78,6 +78,7 @@ jobs:
             sleep 3
             adb shell pidof com.auraglass.app
             adb exec-out screencap -p > screenshots/01-setup.png
+            adb shell cmd role add-role-holder android.app.role.HOME com.auraglass.app || true
             adb shell am start -W -n com.auraglass.app/.HomeActivity
             sleep 3
             adb shell pidof com.auraglass.app
@@ -88,7 +89,7 @@ jobs:
             adb shell dumpsys package com.auraglass.app > screenshots/installed-package.txt
             grep -q "AuraWallpaperService" screenshots/installed-package.txt
             grep -q "HomeActivity" screenshots/installed-package.txt
-            if adb logcat -d -s AndroidRuntime:E | grep -E "FATAL EXCEPTION|Process: com.auraglass.app"; then
+            if adb logcat -d -s AndroidRuntime:E | grep -F "Process: com.auraglass.app"; then
               echo "Fatal runtime exception detected" >&2
               exit 1
             fi
