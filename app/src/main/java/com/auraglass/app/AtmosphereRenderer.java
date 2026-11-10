@@ -52,6 +52,7 @@ public final class AtmosphereRenderer {
         iceEnabled=Config.bool(ctx,"ice_enabled",true);
         snowEnabled=Config.bool(ctx,"snow_enabled",true);
         glassTouch=Config.bool(ctx,"glass_touch",true);
+        reduceMotion=Config.bool(ctx,"reduce_motion",false);
         parallaxEnabled=Config.bool(ctx,"parallax",false)&&!reduceMotion;
         parallaxAmount=Config.number(ctx,"parallax_strength",.35f);
         WeatherRepository.Snapshot climate=WeatherRepository.read(ctx);
@@ -62,8 +63,7 @@ public final class AtmosphereRenderer {
             Config.number(ctx,"frost_recovery",1f)*ClimateGlass.recoveryMultiplier(climate,manual),
             Config.number(ctx,"touch_radius",.057f),
             Config.bool(ctx,"touch_melt",true),reduceMotion);
-        reduceMotion=Config.bool(ctx,"reduce_motion",false);
-        weatherCode=WeatherRepository.read(ctx).code;
+        weatherCode=climate.code;
         String next=actualWeather();
         if(!old.equals(next)){
             previousWeather=old;
