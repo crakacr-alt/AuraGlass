@@ -83,15 +83,27 @@ jobs:
             sleep 5
             adb shell pidof com.auraglass.app
             adb exec-out screencap -p > screenshots/01-setup.png
-            adb shell am start -W -n com.auraglass.app/.DiagnosticsActivity
+            # Access internal, non-exported activities through actual app buttons,
+            # not from the ADB shell UID, preserving Android component isolation.
+            adb shell input tap 900 125
             sleep 2
             adb shell pidof com.auraglass.app
+            adb shell dumpsys activity activities > screenshots/diagnostics-stack.txt
+            grep -q 'DiagnosticsActivity' screenshots/diagnostics-stack.txt
             adb exec-out screencap -p > screenshots/11-diagnostics.png
-            adb shell am start -W -n com.auraglass.app/.WidgetBoardActivity
+            adb shell input keyevent 4
+            sleep 1
+            adb shell am start -W -n com.auraglass.app/.HomeActivity
+            sleep 3
+            # Pixel 6 emulator: the widgets button sits in the Home header.
+            adb shell input tap 840 381
             sleep 2
             adb shell pidof com.auraglass.app
+            adb shell dumpsys activity activities > screenshots/widget-board-stack.txt
+            grep -q 'WidgetBoardActivity' screenshots/widget-board-stack.txt
             adb exec-out screencap -p > screenshots/10-widget-board.png
-            adb shell dumpsys activity activities | grep -q 'WidgetBoardActivity'
+            adb shell input keyevent 4
+            sleep 1
             adb shell am start -W -n com.auraglass.app/.HomeActivity
             sleep 3
             adb exec-out screencap -p > screenshots/02-island-collapsed.png

@@ -114,9 +114,16 @@ public final class SetupActivity extends Activity {
         scroll.addView(main);
         setContentView(scroll);
 
+        LinearLayout titleRow=new LinearLayout(this);
+        titleRow.setGravity(Gravity.CENTER_VERTICAL);
         TextView brand = title("AURA GLASS", 32, true);
-        brand.setLetterSpacing(.14f);
-        main.addView(brand);
+        brand.setLetterSpacing(.09f);
+        titleRow.addView(brand,new LinearLayout.LayoutParams(0,-2,1));
+        Button quickTest=action("Тест",()->
+            startActivity(new Intent(this,DiagnosticsActivity.class)));
+        quickTest.setContentDescription("Диагностика AURA");
+        titleRow.addView(quickTest,new LinearLayout.LayoutParams(dp(95),dp(44)));
+        main.addView(titleRow,new LinearLayout.LayoutParams(-1,-2));
         TextView tag = title("ЖИВОЕ СТЕКЛО ДЛЯ ANDROID", 11, false);
         tag.setTextColor(0xffe6caea);
         main.addView(tag);
