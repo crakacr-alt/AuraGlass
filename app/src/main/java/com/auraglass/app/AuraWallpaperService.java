@@ -19,6 +19,7 @@ public final class AuraWallpaperService extends WallpaperService {
         private final ParallaxMotion motion=new ParallaxMotion(AuraWallpaperService.this,renderer);
         private final RenderBudget budget=new RenderBudget(AuraWallpaperService.this);
         private boolean visible=false,active=true,queued=false;
+        private float lastRequestedRate=-1;
         private int w=1,h=1;
         private final Runnable frame=new Runnable(){
             @Override public void run(){queued=false;render();}
@@ -30,12 +31,16 @@ public final class AuraWallpaperService extends WallpaperService {
         }
         @Override public void onVisibilityChanged(boolean v){
             visible=v;
-            if(v){motion.start();schedule(0);}
-            else{motion.stop();stop();}
+            if(v){lastRequestedRate=-1;motion.start();schedule(0);}
+            else{
+                motion.stop();stop();
+                RefreshRateSupport.applyToSurface(getSurfaceHolder(),0);
+                lastRequestedRate=-1;
+            }
         }
         @Override public void onSurfaceChanged(SurfaceHolder holder,int format,int width,int height){
             super.onSurfaceChanged(holder,format,width,height);
-            w=width;h=height;schedule(0);
+            w=width;h=height;lastRequestedRate=-1;schedule(0);
         }
         @Override public void onTouchEvent(MotionEvent event){
             if(!active||!visible||event==null)return;
@@ -63,8 +68,16 @@ public final class AuraWallpaperService extends WallpaperService {
             if(!visible||!active||queued)return;
             queued=true;handler.postDelayed(frame,delay);
         }
+        private void updatePreferredRate(){
+            float requested=budget.displayTargetHz();
+            if(lastRequestedRate<0||Math.abs(requested-lastRequestedRate)>.5f){
+                RefreshRateSupport.applyToSurface(getSurfaceHolder(),requested);
+                lastRequestedRate=requested;
+            }
+        }
         private void render(){
             if(!visible||!active)return;
+            updatePreferredRate();
             SurfaceHolder holder=getSurfaceHolder();
             Canvas canvas=null;
             long start=SystemClock.uptimeMillis();
@@ -84,6 +97,7 @@ public final class AuraWallpaperService extends WallpaperService {
         }
         @Override public void onSharedPreferenceChanged(SharedPreferences prefs,String key){
             renderer.reload(AuraWallpaperService.this);
+            lastRequestedRate=-1;
             if(visible){motion.stop();motion.start();stop();schedule(0);}
         }
         @Override public void onDestroy(){

@@ -55,6 +55,7 @@ public final class HomeActivity extends Activity {
     }
     @Override protected void onCreate(Bundle state){
         super.onCreate(state);
+        RefreshRateSupport.applyToActivity(this);
         getWindow().setStatusBarColor(Color.TRANSPARENT);
         getWindow().setNavigationBarColor(0xff181a2d);
         getWindow().getDecorView().setSystemUiVisibility(
@@ -359,6 +360,7 @@ public final class HomeActivity extends Activity {
     }
     @Override protected void onResume(){
         super.onResume();
+        RefreshRateSupport.applyToActivity(this);
         timer.removeCallbacks(clockTick);clockTick.run();
         WeatherRepository.refresh(this,false,(ok,msg)->{
             if(weatherCard!=null)weatherCard.refresh();

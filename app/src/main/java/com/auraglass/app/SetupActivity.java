@@ -6,6 +6,12 @@ import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
+import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
+import android.Manifest;
+import android.content.pm.PackageManager;
+import android.widget.Switch;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
@@ -19,6 +25,23 @@ public final class SetupActivity extends Activity {
     private TextView wallpaperStatus;
     private TextView subtitle;
     private AtmospherePreviewView preview;
+    private TextView updateStatus,updateHeader,updateDescription;
+    private Button downloadUpdate,installUpdate;
+    private LinearLayout updateBanner;
+    private Switch notificationUpdates;
+    private UpdateCenter.Release pendingRelease;
+    private boolean visible=false,checkedEntry=false;
+    private final Handler updateHandler=new Handler(Looper.getMainLooper());
+    private final Runnable updateProgress=new Runnable(){
+        @Override public void run(){
+            if(!visible)return;
+            UpdateCenter.downloadStatus(SetupActivity.this,(message,ready)->{
+                if(updateStatus!=null&&message.length()>0)updateStatus.setText(message);
+                if(installUpdate!=null)installUpdate.setVisibility(ready?View.VISIBLE:View.GONE);
+            });
+            updateHandler.postDelayed(this,1800);
+        }
+    };
 
     private int dp(float value) {
         return (int)(value * getResources().getDisplayMetrics().density + .5f);
@@ -98,6 +121,25 @@ public final class SetupActivity extends Activity {
         tag.setTextColor(0xffe6caea);
         main.addView(tag);
         gap(main, 14);
+        updateBanner=column();
+        updateBanner.setPadding(dp(15),dp(14),dp(15),dp(15));
+        updateBanner.setBackground(surface(0xb0536596,22));
+        updateBanner.setVisibility(View.GONE);
+        updateHeader=title("Доступно обновление AURA",19,true);
+        updateBanner.addView(updateHeader);
+        updateDescription=title("Новый стабильный релиз на GitHub",12,false);
+        updateDescription.setTextColor(0xffdae2fa);
+        updateBanner.addView(updateDescription);
+        downloadUpdate=action("Скачать новую версию",()->downloadUpdate());
+        addUpdateAction(updateBanner,downloadUpdate);
+        installUpdate=action("Проверить APK и установить",()->
+            UpdateCenter.installDownloaded(this,(message,ready)->{
+                updateStatus.setText(message);
+                installUpdate.setVisibility(ready?View.VISIBLE:View.GONE);
+            }));
+        installUpdate.setVisibility(View.GONE);
+        addUpdateAction(updateBanner,installUpdate);
+        main.addView(updateBanner,new LinearLayout.LayoutParams(-1,-2));
         preview = new AtmospherePreviewView(this);
         main.addView(preview, new LinearLayout.LayoutParams(-1, dp(225)));
         gap(main, 14);
@@ -172,11 +214,89 @@ public final class SetupActivity extends Activity {
             catch(RuntimeException ignored){}
         });
         addButton(islandSection,"Открыть микшер громкости",()->AuraAudioMixer.show(this));
+
+        LinearLayout updates=section(main,"05 · Обновления AURA",
+            "Проверка только при открытии приложения. Никаких фоновых проверок и автоматической установки.");
+        updateStatus=title("Проверка ещё не выполнялась",12,false);
+        updateStatus.setTextColor(0xffd4ddf4);
+        updates.addView(updateStatus,new LinearLayout.LayoutParams(-1,-2));
+
+        Switch onOpen=new Switch(this);
+        onOpen.setText("Проверять при запуске AURA");
+        onOpen.setTextColor(Color.WHITE);
+        onOpen.setTextSize(13);
+        onOpen.setChecked(Config.bool(this,"updates_on_open",true));
+        onOpen.setOnCheckedChangeListener((button,checked)->
+            Config.put(this,"updates_on_open",checked));
+        updates.addView(onOpen,new LinearLayout.LayoutParams(-1,dp(50)));
+
+        notificationUpdates=new Switch(this);
+        notificationUpdates.setText("Показывать обновления в шторке");
+        notificationUpdates.setTextSize(13);
+        notificationUpdates.setTextColor(Color.WHITE);
+        notificationUpdates.setChecked(Config.bool(this,"updates_notification",false));
+        notificationUpdates.setOnCheckedChangeListener((button,checked)->{
+            Config.put(this,"updates_notification",checked);
+            if(checked&&Build.VERSION.SDK_INT>=33&&
+                checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=
+                PackageManager.PERMISSION_GRANTED)
+                requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},763);
+        });
+        updates.addView(notificationUpdates,new LinearLayout.LayoutParams(-1,dp(50)));
+        addButton(updates,"Проверить сейчас",this::checkUpdate);
+        addButton(updates,"Открыть GitHub Releases",()->UpdateCenter.openReleases(this));
+        addButton(updates,"Установить скачанный APK",()->
+            UpdateCenter.installDownloaded(this,(message,ready)->{
+                updateStatus.setText(message);
+                if(installUpdate!=null)installUpdate.setVisibility(ready?View.VISIBLE:View.GONE);
+            }));
+
         gap(main, 20);
         TextView note = title("Тестовая версия. Системная шторка и экран блокировки остаются под управлением One UI.", 11, false);
         note.setTextColor(0xffc7bfd6);
         main.addView(note);
         updateStatus();
+        if(Config.bool(this,"updates_on_open",true))checkUpdate();
+    }
+    private void addUpdateAction(LinearLayout parent,Button button){
+        LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,dp(50));
+        p.topMargin=dp(9);
+        parent.addView(button,p);
+    }
+    private void checkUpdate(){
+        if(updateStatus!=null)updateStatus.setText("Проверяю официальный стабильный релиз GitHub…");
+        UpdateCenter.checkOnEntry(this,(release,explanation)->{
+            if(release==null){
+                if(updateStatus!=null)updateStatus.setText(
+                    explanation==null?"Новых стабильных версий нет":explanation);
+                return;
+            }
+            pendingRelease=release;
+            updateBanner.setVisibility(View.VISIBLE);
+            updateHeader.setText("Новая версия AURA GLASS "+release.tag);
+            updateDescription.setText("Официальный стабильный APK. Установка — только с подтверждением Android.");
+            updateStatus.setText("Доступно обновление "+release.tag);
+            UpdateCenter.downloadStatus(this,(message,ready)->{
+                if(ready)installUpdate.setVisibility(View.VISIBLE);
+            });
+        });
+    }
+    private void downloadUpdate(){
+        if(pendingRelease==null)return;
+        if(UpdateCenter.beginDownload(this,pendingRelease)){
+            updateStatus.setText("Загрузка "+pendingRelease.tag+" запущена через Android");
+            downloadUpdate.setText("Загрузить заново");
+            if(installUpdate!=null)installUpdate.setVisibility(View.GONE);
+        }
+    }
+    @Override public void onRequestPermissionsResult(int requestCode,String[] permissions,int[] grants){
+        super.onRequestPermissionsResult(requestCode,permissions,grants);
+        if(requestCode==763&&Build.VERSION.SDK_INT>=33&&
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=
+            PackageManager.PERMISSION_GRANTED){
+            Config.put(this,"updates_notification",false);
+            if(notificationUpdates!=null)notificationUpdates.setChecked(false);
+        }
     }
 
     private void updateStatus() {
@@ -196,6 +316,15 @@ public final class SetupActivity extends Activity {
     }
     @Override protected void onResume() {
         super.onResume();
+        RefreshRateSupport.applyToActivity(this);
+        visible=true;
         updateStatus();
+        updateHandler.removeCallbacks(updateProgress);
+        updateHandler.post(updateProgress);
+    }
+    @Override protected void onPause(){
+        visible=false;
+        updateHandler.removeCallbacks(updateProgress);
+        super.onPause();
     }
 }

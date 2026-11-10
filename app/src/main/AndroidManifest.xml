@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- This APK is distributed via GitHub Releases, not Google Play. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
@@ -44,6 +47,10 @@
             <intent-filter><action android:name="android.service.wallpaper.WallpaperService"/></intent-filter>
             <meta-data android:name="android.service.wallpaper" android:resource="@xml/aura_wallpaper"/>
         </service>
+        <provider android:name=".UpdateApkProvider"
+            android:authorities="com.auraglass.app.updates"
+            android:exported="false"
+            android:grantUriPermissions="true"/>
         <receiver android:name=".WeatherWidgetProvider" android:exported="true"
             android:label="AURA Weather">
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE"/></intent-filter>

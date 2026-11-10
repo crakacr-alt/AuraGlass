@@ -25,6 +25,7 @@ public final class IceShowcaseActivity extends Activity {
     }
     @Override public void onCreate(Bundle saved){
         super.onCreate(saved);
+        RefreshRateSupport.applyToActivity(this);
         // Explicit demo scene, never installs or replaces the user's wallpaper.
         Config.put(this,"weather_mode","ice");
         Config.put(this,"time_mode","night");
@@ -103,6 +104,10 @@ public final class IceShowcaseActivity extends Activity {
         }
         void pause(){active=false;motion.stop();}
     }
-    @Override protected void onResume(){super.onResume();if(scene!=null)scene.resume();}
+    @Override protected void onResume(){
+        super.onResume();
+        RefreshRateSupport.applyToActivity(this);
+        if(scene!=null)scene.resume();
+    }
     @Override protected void onPause(){if(scene!=null)scene.pause();super.onPause();}
 }

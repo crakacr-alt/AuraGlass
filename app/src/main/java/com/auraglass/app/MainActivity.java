@@ -66,6 +66,7 @@ public final class MainActivity extends Activity {
     }
     @Override protected void onCreate(Bundle saved){
         super.onCreate(saved);
+        RefreshRateSupport.applyToActivity(this);
         getWindow().setStatusBarColor(0xff17182f);getWindow().setNavigationBarColor(0xff111325);
         ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);
         scroll.setBackground(new GradientDrawable(GradientDrawable.Orientation.TL_BR,
@@ -163,6 +164,7 @@ public final class MainActivity extends Activity {
         LinearLayout perf=surface();
         add(content,perf,-2);
         modeRowQuality(perf);
+        frameRateControls(perf);
         section(content,"Тонкая настройка",null);
         LinearLayout sliders=surface();add(content,sliders,-2);
         slider(sliders,"Интенсивность эффектов","intensity",.58f);
@@ -171,7 +173,6 @@ public final class MainActivity extends Activity {
         setting(sliders,"Северное сияние","aurora",true);
         setting(sliders,"Молнии во время грозы","lightning",true);
         setting(sliders,"Звёзды и метеоры","stars",true);
-        setting(sliders,"Высокая плавность (до 60 FPS)","high_fps",false);
         setting(sliders,"Уменьшить движение","reduce_motion",false);
 
         section(content,"Обои и лаунчер","Обои не меняются без подтверждения. Один тап возвращает в настройки Android.");
@@ -237,6 +238,40 @@ public final class MainActivity extends Activity {
             @Override public void onStartTrackingTouch(SeekBar s){}
             @Override public void onStopTrackingTouch(SeekBar s){}
         });
+    }
+    private void frameRateControls(LinearLayout parent){
+        float supported=RefreshRateSupport.maximumHz(this);
+        boolean can120=RefreshRateSupport.supports120(this);
+        TextView header=text("Частота анимации",15,true);
+        LinearLayout.LayoutParams hp=params(-1,-2);
+        hp.topMargin=dp(14);
+        parent.addView(header,hp);
+        LinearLayout row=new LinearLayout(this);
+        String[] values={"auto","60","120"};
+        String[] labels={"Система","60 FPS","120 FPS"};
+        for(int i=0;i<values.length;i++){
+            final String target=values[i];
+            Button button=action(labels[i],()->{
+                Config.put(this,"frame_rate",target);
+                RefreshRateSupport.applyToActivity(this);
+                preview.reload();
+            });
+            if("120".equals(target)&&!can120){
+                button.setEnabled(false);
+                button.setAlpha(.36f);
+            }
+            LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(0,dp(45),1);
+            if(i>0)cp.leftMargin=dp(5);
+            row.addView(button,cp);
+        }
+        LinearLayout.LayoutParams rp=params(-1,45);rp.topMargin=dp(8);
+        parent.addView(row,rp);
+        String info=can120?
+            "Экран поддерживает до "+Math.round(supported)+
+            " Гц. Режим 120 запрашивает повышенную частоту; реальный FPS зависит от сцены и One UI.":
+            "На этом экране режим 120 Гц недоступен (максимум "+Math.round(supported)+" Гц).";
+        TextView note=text(info,12,false);note.setTextColor(MUTED);
+        add(parent,note,-2);
     }
     private void modeRowQuality(LinearLayout parent){
         LinearLayout row=vertical();
@@ -351,6 +386,7 @@ public final class MainActivity extends Activity {
             "   ·   "+(Activation.isLiveWallpaperActive(this)?"✓ Живые обои включены":"○ Живые обои не выбраны"));
     }
     @Override protected void onResume(){
+        RefreshRateSupport.applyToActivity(this);
         super.onResume();
         if(preview!=null)preview.reload();
         updateActivationStatus();
