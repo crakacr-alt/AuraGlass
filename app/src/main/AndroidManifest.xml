@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <uses-feature android:name="android.software.live_wallpaper" android:required="false"/>
+    <queries>
+        <intent><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent>
+        <package android:name="com.sec.android.daemonapp"/>
+        <package android:name="com.samsung.android.weather"/>
+    </queries>
+    <application android:allowBackup="true" android:label="@string/app_name"
+        android:icon="@drawable/ic_aura" android:theme="@style/AuraTheme"
+        android:supportsRtl="true" android:usesCleartextTraffic="false">
+        <activity android:name=".MainActivity" android:exported="true" android:label="@string/app_name">
+            <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
+        </activity>
+        <activity android:name=".HomeActivity" android:exported="true" android:launchMode="singleTask"
+            android:theme="@style/AuraHomeTheme" android:label="AURA Home">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.HOME"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+            </intent-filter>
+        </activity>
+        <activity android:name=".WeatherLaunchActivity" android:exported="false"
+            android:theme="@style/AuraTheme"/>
+        <service android:name=".AuraWallpaperService" android:exported="true"
+            android:permission="android.permission.BIND_WALLPAPER" android:label="AURA Live Atmosphere">
+            <intent-filter><action android:name="android.service.wallpaper.WallpaperService"/></intent-filter>
+            <meta-data android:name="android.service.wallpaper" android:resource="@xml/aura_wallpaper"/>
+        </service>
+        <receiver android:name=".WeatherWidgetProvider" android:exported="true"
+            android:label="AURA Weather">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE"/></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/weather_widget_info"/>
+        </receiver>
+    </application>
+</manifest>
