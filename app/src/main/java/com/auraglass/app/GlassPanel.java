@@ -78,12 +78,14 @@ public final class GlassPanel extends FrameLayout {
         float strength=frostStrength();
         long now=SystemClock.uptimeMillis();
         boolean transientCold=lastWarmAt>0&&now-lastWarmAt<16000;
-        if(w>0&&h>0&&(strength>.01f||transientCold)){
-            canvas.save();
+        if(w>0&&h>0){
             bounds.set(0,0,w,h);
             clip.reset();
             float radius=27*getResources().getDisplayMetrics().density;
             clip.addRoundRect(bounds,radius,radius,Path.Direction.CW);
+        }
+        if(w>0&&h>0&&(strength>.01f||transientCold)){
+            canvas.save();
             canvas.clipPath(clip);
             if(strength>.01f){
                 if(ice==null)ice=new IceGlassLayer();
@@ -99,7 +101,7 @@ public final class GlassPanel extends FrameLayout {
             float radius=(holding?56:58+age*84)*d;
             int alpha=(int)(43*fade);
             sparkle.setShader(new RadialGradient(pressedX,pressedY,radius,
-                new int[]{(alpha<<24)|0x00eafbff,0x1fcceff9,0x00ffffff},
+                new int[]{(alpha<<24)|0x00eafbff,((int)(29*fade)<<24)|0x00cceff9,0x00ffffff},
                 new float[]{0,.35f,1},Shader.TileMode.CLAMP));
             canvas.save();
             canvas.clipPath(clip);
