@@ -24,6 +24,7 @@ import android.widget.FrameLayout;
 import android.widget.GridView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 import java.text.SimpleDateFormat;
@@ -376,6 +377,10 @@ public final class HomeActivity extends Activity {
     private void showHome(){
         if(island!=null)island.pause();
         root.removeAllViews();drawer=null;island=null;
+        ScrollView scroll=new ScrollView(this);
+        scroll.setFillViewport(true);
+        scroll.setVerticalScrollBarEnabled(false);
+        root.addView(scroll,new FrameLayout.LayoutParams(-1,-1));
         LinearLayout vertical=new LinearLayout(this);
         vertical.setOrientation(LinearLayout.VERTICAL);
         vertical.setPadding(dp(17),dp(101),dp(17),dp(18));
@@ -384,7 +389,7 @@ public final class HomeActivity extends Activity {
             view.setPadding(dp(17),Math.max(dp(101),insets.getSystemWindowInsetTop()+dp(68)),dp(17),Math.max(dp(18),dp(12)+insetBottom));
             return insets;
         });
-        root.addView(vertical,new FrameLayout.LayoutParams(-1,-1));
+        scroll.addView(vertical,new ScrollView.LayoutParams(-1,-2));
 
         LinearLayout header=new LinearLayout(this);
         header.setGravity(Gravity.CENTER_VERTICAL);
@@ -589,9 +594,23 @@ public final class HomeActivity extends Activity {
             return cell;
         }
     }
+    private void refreshInstalledApps(){
+        ArrayList<String> before=new ArrayList<>();
+        for(ResolveInfo item:applications)before.add(componentKey(item));
+        loadApplications();
+        ArrayList<String> after=new ArrayList<>();
+        for(ResolveInfo item:applications)after.add(componentKey(item));
+        if(!before.equals(after))showHome();
+    }
+    @Override protected void onNewIntent(Intent intent){
+        super.onNewIntent(intent);
+        if(intent!=null&&Intent.ACTION_MAIN.equals(intent.getAction())&&
+           intent.hasCategory(Intent.CATEGORY_HOME)&&drawer!=null)closeDrawer(true);
+    }
     @Override protected void onResume(){
         super.onResume();
         RefreshRateSupport.applyToActivity(this);
+        refreshInstalledApps();
         timer.removeCallbacks(clockTick);clockTick.run();
         WeatherRepository.refresh(this,false,(ok,msg)->{
             if(weatherCard!=null)weatherCard.refresh();
