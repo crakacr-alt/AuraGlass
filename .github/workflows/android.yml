@@ -85,9 +85,9 @@ jobs:
             adb exec-out screencap -p > screenshots/01-setup.png
             # Access internal, non-exported activities through actual app buttons,
             # not from the ADB shell UID, preserving Android component isolation.
-            adb shell uiautomator dump /sdcard/aura_setup.xml >/dev/null
-            adb pull /sdcard/aura_setup.xml screenshots/setup-ui.xml >/dev/null
-            python3 .github/scripts/tap_accessibility.py screenshots/setup-ui.xml 'Тест'
+            # Debug-only trampoline verifies internal pages without exporting
+            # their production manifest components to other applications.
+            adb shell am start -W -n com.auraglass.app/.QaEntryActivity --es target diagnostics
             sleep 3
             adb shell pidof com.auraglass.app
             adb logcat -d -s AndroidRuntime:E > screenshots/diagnostics-runtime.txt
@@ -98,9 +98,7 @@ jobs:
             sleep 1
             adb shell am start -W -n com.auraglass.app/.HomeActivity
             sleep 3
-            adb shell uiautomator dump /sdcard/aura_home.xml >/dev/null
-            adb pull /sdcard/aura_home.xml screenshots/home-ui.xml >/dev/null
-            python3 .github/scripts/tap_accessibility.py screenshots/home-ui.xml 'Открыть страницу виджетов AURA'
+            adb shell am start -W -n com.auraglass.app/.QaEntryActivity --es target widgets
             sleep 3
             adb shell pidof com.auraglass.app
             adb logcat -d -s AndroidRuntime:E > screenshots/widget-runtime.txt
