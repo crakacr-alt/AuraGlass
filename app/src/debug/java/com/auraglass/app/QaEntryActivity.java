@@ -87,6 +87,36 @@ public final class QaEntryActivity extends Activity {
             android.util.Log.i("AURA_QA",okay?"PAGES_OK":"PAGES_FAILED");
             finish();return;
         }
+        if("widget_bind".equals(target)){
+            int widgetId=-1;
+            boolean bound=false;
+            try{
+                android.appwidget.AppWidgetHost appHost=
+                    new android.appwidget.AppWidgetHost(this,70901);
+                widgetId=appHost.allocateAppWidgetId();
+                android.appwidget.AppWidgetManager manager=
+                    android.appwidget.AppWidgetManager.getInstance(this);
+                android.content.ComponentName provider=
+                    new android.content.ComponentName(this,WeatherWidgetProvider.class);
+                bound=manager.bindAppWidgetIdIfAllowed(widgetId,provider);
+                bound=bound&&manager.getAppWidgetInfo(widgetId)!=null;
+                if(bound){
+                    String previous=Config.str(this,"widget_board_ids","");
+                    Config.put(this,"widget_board_ids",
+                        previous.isEmpty()?String.valueOf(widgetId):previous+","+widgetId);
+                    Config.put(this,"widget_page_"+widgetId,0f);
+                    WeatherWidgetProvider.updateAll(this);
+                    startActivity(new Intent(this,HomeActivity.class));
+                }else{
+                    appHost.deleteAppWidgetId(widgetId);
+                }
+            }catch(Exception e){
+                android.util.Log.e("AURA_QA","WIDGET_BIND_EXCEPTION",e);
+                bound=false;
+            }
+            android.util.Log.i("AURA_QA",bound?"WIDGET_BIND_OK":"WIDGET_BIND_FAILED");
+            finish();return;
+        }
         if("diagnostics".equals(target))page=DiagnosticsActivity.class;
         else if("widgets".equals(target))page=WidgetBoardActivity.class;
         else if("ice".equals(target))page=IceShowcaseActivity.class;

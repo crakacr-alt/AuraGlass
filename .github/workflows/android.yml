@@ -116,8 +116,17 @@ jobs:
             grep -q 'WidgetBoardActivity' screenshots/widget-board-stack.txt
             adb shell input keyevent 4
             sleep 1
+            # Grant bind permission only inside this ephemeral emulator.
+            # Real users must approve widget binding through the system UI.
+            adb shell appwidget grantbind --package com.auraglass.app --user current
+            adb shell am start -W -n com.auraglass.app/.QaEntryActivity --es target widget_bind
+            sleep 4
+            adb logcat -d -s AURA_QA:I > screenshots/widget-bind.txt
+            grep -q 'WIDGET_BIND_OK' screenshots/widget-bind.txt
             adb shell am start -W -n com.auraglass.app/.HomeActivity
             sleep 3
+            adb exec-out screencap -p > screenshots/12-live-widget-on-home.png
+            test "$(stat -c %s screenshots/12-live-widget-on-home.png)" -gt 90000
             adb exec-out screencap -p > screenshots/02-island-collapsed.png
             adb shell input tap 540 165
             sleep 2
