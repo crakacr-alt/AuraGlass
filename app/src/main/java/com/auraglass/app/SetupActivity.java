@@ -163,6 +163,10 @@ public final class SetupActivity extends Activity {
         noticeToggle.setOnCheckedChangeListener((button,checked)->
             Config.put(this,"island_show_notification_text",checked));
         islandSection.addView(noticeToggle,new LinearLayout.LayoutParams(-1,dp(49)));
+        TextView restricted=title("На Android 13+ доступ к уведомлениям для APK из GitHub может быть ограничен самой системой. Не меняйте защитные настройки, пока не проверите источник и подпись APK.",11,false);
+        restricted.setSingleLine(false);
+        restricted.setTextColor(0xffc2cedc);
+        islandSection.addView(restricted,new LinearLayout.LayoutParams(-1,-2));
         addButton(islandSection,"Разрешить доступ к уведомлениям",()->{
             try{startActivity(new Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS));}
             catch(RuntimeException ignored){}
