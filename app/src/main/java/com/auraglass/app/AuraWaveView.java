@@ -13,6 +13,9 @@ public final class AuraWaveView extends View {
     private final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);
     private final float[] values=new float[24];
     private final float[] smoothed=new float[24];
+    private final RectF barRect=new RectF();
+    private Shader gradient;
+    private int shaderHeight=-1;
     private boolean actualAudio=false;
     public AuraWaveView(Context context){super(context);}
     public void setBands(float[] levels){
@@ -35,15 +38,26 @@ public final class AuraWaveView extends View {
         if(width<=0||height<=0)return;
         float step=width/24f;
         float bar=Math.max(1.25f,step*.46f);
-        paint.setShader(new LinearGradient(0,0,0,height,
-            new int[]{0xffd6bcff,0xff82f7e3,0xff76b4f3},null,Shader.TileMode.CLAMP));
+        if(gradient==null||shaderHeight!=getHeight()){
+            shaderHeight=getHeight();
+            gradient=new LinearGradient(0,0,0,height,
+                new int[]{0xffd6bcff,0xff82f7e3,0xff76b4f3},null,Shader.TileMode.CLAMP);
+        }
+        paint.setShader(gradient);
         for(int i=0;i<24;i++){
             float target=actualAudio?Math.max(.09f,values[i]):.12f;
-            smoothed[i]=smoothed[i]*.60f+target*.40f;
+            smoothed[i]=smoothed[i]*.74f+target*.26f;
             float half=Math.max(1.5f,height*.48f*smoothed[i]);
             float x=step*(i+.5f);
-            c.drawRoundRect(new RectF(x-bar/2,height/2-half,x+bar/2,height/2+half),bar/2,bar/2,paint);
+            barRect.set(x-bar/2,height/2-half,x+bar/2,height/2+half);
+            c.drawRoundRect(barRect,bar/2,bar/2,paint);
         }
         paint.setShader(null);
+        if(actualAudio&&getWindowVisibility()==VISIBLE){
+            android.os.PowerManager power=(android.os.PowerManager)
+                getContext().getSystemService(Context.POWER_SERVICE);
+            boolean saver=power!=null&&power.isPowerSaveMode();
+            postInvalidateDelayed(saver?50:Config.bool(getContext(),"high_fps",false)?8:16);
+        }
     }
 }
