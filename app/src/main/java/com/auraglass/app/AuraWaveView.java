@@ -57,7 +57,10 @@ public final class AuraWaveView extends View {
             android.os.PowerManager power=(android.os.PowerManager)
                 getContext().getSystemService(Context.POWER_SERVICE);
             boolean saver=power!=null&&power.isPowerSaveMode();
-            postInvalidateDelayed(saver?50:Config.bool(getContext(),"high_fps",false)?8:16);
+            float hz=RefreshRateSupport.requestedHz(getContext());
+            int delay=(int)Math.max(8,Math.round(1000f/Math.max(30f,hz)));
+            postInvalidateDelayed(saver?65:
+                Config.bool(getContext(),"reduce_motion",false)?50:delay);
         }
     }
 }

@@ -58,7 +58,10 @@ public final class WeatherCardView extends View {
         if(running){
             android.os.PowerManager pm=(android.os.PowerManager)getContext().getSystemService(Context.POWER_SERVICE);
             boolean saver=pm!=null&&pm.isPowerSaveMode();
-            postInvalidateDelayed(saver?95:(Config.bool(getContext(),"high_fps",false)?17:42));
+            float hz=RefreshRateSupport.requestedHz(getContext());
+            int delay=(int)Math.max(8,Math.round(1000f/Math.max(30f,hz)));
+            postInvalidateDelayed(saver?95:
+                Config.bool(getContext(),"reduce_motion",false)?66:delay);
         }
     }
     @Override public boolean onTouchEvent(MotionEvent event){
