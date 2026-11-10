@@ -39,7 +39,7 @@ jobs:
           AAPT="${ANDROID_HOME:-${ANDROID_SDK_ROOT}}/build-tools/35.0.0/aapt"
           "$AAPT" dump badging "$APK" | grep "package: name='com.auraglass.app'"
           "$AAPT" dump xmltree "$APK" AndroidManifest.xml > /tmp/aura-manifest.txt
-          for entry in SetupActivity HomeActivity AuraWallpaperService AuraEventListener android.intent.category.HOME android.service.wallpaper.WallpaperService android.service.notification.NotificationListenerService; do
+          for entry in SetupActivity HomeActivity IceShowcaseActivity AuraWallpaperService AuraEventListener android.intent.category.HOME android.service.wallpaper.WallpaperService android.service.notification.NotificationListenerService; do
             grep -q "$entry" /tmp/aura-manifest.txt
           done
           "${ANDROID_HOME:-${ANDROID_SDK_ROOT}}/build-tools/35.0.0/apksigner" verify --verbose "$APK"
@@ -88,6 +88,16 @@ jobs:
             adb shell am start -W -n com.auraglass.app/.MainActivity
             sleep 2
             adb exec-out screencap -p > screenshots/04-editor.png
+            adb shell am start -W -n com.auraglass.app/.IceShowcaseActivity
+            sleep 3
+            adb exec-out screencap -p > screenshots/06-ice-before.png
+            adb shell input swipe 270 1000 810 1420 900
+            sleep 1
+            adb exec-out screencap -p > screenshots/07-ice-finger-trail.png
+            sleep 4
+            adb exec-out screencap -p > screenshots/08-ice-refreeze.png
+            test "$(stat -c %s screenshots/06-ice-before.png)" -gt 90000
+            test "$(stat -c %s screenshots/07-ice-finger-trail.png)" -gt 90000
             adb shell am start -W -a android.service.wallpaper.CHANGE_LIVE_WALLPAPER --ecn android.service.wallpaper.extra.LIVE_WALLPAPER_COMPONENT com.auraglass.app/.AuraWallpaperService
             sleep 3
             adb exec-out screencap -p > screenshots/05-wallpaper-preview.png

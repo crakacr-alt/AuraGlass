@@ -8,6 +8,7 @@ import android.os.Looper;
 import android.os.PowerManager;
 import android.os.SystemClock;
 import android.view.SurfaceHolder;
+import android.view.MotionEvent;
 
 /** Only renders while visible; never changes the user's wallpaper without confirmation. */
 public final class AuraWallpaperService extends WallpaperService {
@@ -22,12 +23,31 @@ public final class AuraWallpaperService extends WallpaperService {
         };
         AuraEngine(){
             renderer.reload(AuraWallpaperService.this);
+            setTouchEventsEnabled(true);
             Config.prefs(AuraWallpaperService.this).registerOnSharedPreferenceChangeListener(this);
         }
         @Override public void onVisibilityChanged(boolean v){visible=v;if(v)schedule(0);else stop();}
         @Override public void onSurfaceChanged(SurfaceHolder holder,int format,int width,int height){
             super.onSurfaceChanged(holder,format,width,height);
             w=width;h=height;schedule(0);
+        }
+        @Override public void onTouchEvent(MotionEvent event){
+            if(!active||!visible||event==null)return;
+            int type=event.getActionMasked();
+            if(type==MotionEvent.ACTION_DOWN){
+                renderer.startTouch(event.getX(),event.getY(),w,h,event.getEventTime());
+                schedule(0);
+            }else if(type==MotionEvent.ACTION_MOVE){
+                int n=event.getHistorySize();
+                for(int i=0;i<n;i++){
+                    renderer.moveTouch(event.getHistoricalX(i),event.getHistoricalY(i),w,h,
+                        event.getHistoricalEventTime(i));
+                }
+                renderer.moveTouch(event.getX(),event.getY(),w,h,event.getEventTime());
+                schedule(0);
+            }else if(type==MotionEvent.ACTION_UP||type==MotionEvent.ACTION_CANCEL){
+                renderer.endTouch();
+            }
         }
         @Override public void onSurfaceDestroyed(SurfaceHolder holder){
             visible=false;stop();super.onSurfaceDestroyed(holder);

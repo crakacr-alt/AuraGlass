@@ -15,10 +15,14 @@ import java.util.Random;
 /** Shared deterministic scene renderer: wallpaper and in-app preview use identical weather/light rules. */
 public final class AtmosphereRenderer {
     private final Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final IceGlassLayer iceGlass=new IceGlassLayer();
+    private final CelestialLayer celestial=new CelestialLayer();
     private final float[] rx=new float[125],ry=new float[125],rv=new float[125],rs=new float[125];
     private String mode="auto", period="auto";
     private float intensity=.58f,speed=.65f;
     private boolean aurora=true,stars=true,lightning=true,reduceMotion=false;
+    private boolean galaxy=true,comets=true,iceEnabled=true,snowEnabled=true,glassTouch=true;
+    private float wind=0.17f;
     private int weatherCode=0;
     private String previousWeather=null;
     private long weatherChangeAt=0;
@@ -40,6 +44,16 @@ public final class AtmosphereRenderer {
         aurora=Config.bool(ctx,"aurora",true);
         stars=Config.bool(ctx,"stars",true);
         lightning=Config.bool(ctx,"lightning",true);
+        galaxy=Config.bool(ctx,"galaxy",true);
+        comets=Config.bool(ctx,"comets",true);
+        iceEnabled=Config.bool(ctx,"ice_enabled",true);
+        snowEnabled=Config.bool(ctx,"snow_enabled",true);
+        glassTouch=Config.bool(ctx,"glass_touch",true);
+        wind=Math.max(-1f,Math.min(1f,WeatherRepository.read(ctx).wind/28f));
+        iceGlass.configure(Config.number(ctx,"frost_strength",.92f),
+            Config.number(ctx,"frost_recovery",1f),
+            Config.number(ctx,"touch_radius",.057f),
+            Config.bool(ctx,"touch_melt",true),reduceMotion);
         reduceMotion=Config.bool(ctx,"reduce_motion",false);
         weatherCode=WeatherRepository.read(ctx).code;
         String next=actualWeather();
@@ -51,6 +65,13 @@ public final class AtmosphereRenderer {
     private float effectPower(String current,String previous,String key,float mix){
         return (current.equals(key)?mix:0f)+(previous.equals(key)?1f-mix:0f);
     }
+    public void startTouch(float x,float y,int width,int height,long when){
+        iceGlass.startStroke(x,y,width,height,when);
+    }
+    public void moveTouch(float x,float y,int width,int height,long when){
+        iceGlass.stroke(x,y,width,height,when);
+    }
+    public void endTouch(){iceGlass.endStroke();}
     private int alpha(int color,int a){return (color&0x00ffffff)|(Math.max(0,Math.min(a,255))<<24);}
     private int blend(int a,int b,float t){
         t=Config.clamp(t,0,1);
@@ -97,8 +118,10 @@ public final class AtmosphereRenderer {
         String before=previousWeather==null?weather:previousWeather;
         if(mix>=1)previousWeather=null;
         float rainPower=effectPower(weather,before,"rain",mix)+effectPower(weather,before,"storm",mix);
-        float icePower=effectPower(weather,before,"ice",mix)+effectPower(weather,before,"snow",mix);
-        float snowPower=icePower;
+        float icePower=iceEnabled?
+            effectPower(weather,before,"ice",mix)+.40f*effectPower(weather,before,"snow",mix):0;
+        float snowPower=snowEnabled?
+            effectPower(weather,before,"snow",mix)+.72f*effectPower(weather,before,"ice",mix):0;
         float fogPower=effectPower(weather,before,"fog",mix);
         boolean rain=rainPower>.005f;
         boolean ice=icePower>.005f;
@@ -134,14 +157,7 @@ public final class AtmosphereRenderer {
         }
         if(daylight<.9f){
             float night=1-daylight;
-            if(stars){
-                for(int i=0;i<75;i++){
-                    float x=rx[i]*w,y=ry[i]*h*.72f;
-                    float twinkle=.67f+.33f*(float)Math.sin(motion*.75+i*4.21);
-                    p.setColor(Color.argb((int)(night*(65+100*twinkle)),231,239,255));
-                    c.drawCircle(x,y,Math.max(.6f,w*.0024f*rs[i]),p);
-                }
-            }
+            celestial.draw(c,w,h,motion,night,stars,galaxy,comets,reduceMotion);
             float moonX=w*.72f,moonY=h*.18f;
             glow(c,moonX,moonY,w*.28f,alpha(0xffc7d8ff,(int)(49*night)));
             disk(c,moonX,moonY,Math.max(6,w*.045f),alpha(0xffe7e9ff,(int)(175*night)));
@@ -151,15 +167,7 @@ public final class AtmosphereRenderer {
                 float clearBlend=("clear".equals(weather)?mix:0f)+("clear".equals(before)?1f-mix:0f);
                 drawAurora(c,w,h,motion,night*Math.max(clearBlend,icePower));
             }
-            if(stars&&night>.7f&&!rain){
-                float phase=motion%68;
-                if(phase<1.6f){
-                    float xx=w*(.76f-.54f*phase/1.6f), yy=h*(.12f+.21f*phase/1.6f);
-                    p.setStrokeWidth(Math.max(1,w*.0025f));p.setStrokeCap(Paint.Cap.ROUND);
-                    p.setColor(alpha(0xfffaf4ff,(int)(170*(1-phase/1.6f))));
-                    c.drawLine(xx,yy,xx+w*.12f,yy-h*.075f,p);
-                }
-            }
+            // Smooth, separately phased time-lapse comets are handled by CelestialLayer.
         }
         for(int i=0;i<4;i++){
             float fx=rx[80+i]*w+ (float)Math.sin(motion*.025+i)*w*.045f;
@@ -170,8 +178,11 @@ public final class AtmosphereRenderer {
         drawRidge(c,w,h,motion,daylight,twilight);
         if(rain)drawRain(c,w,h,motion,intensity*rainPower,lightning&&"storm".equals(weather));
         if(snow)drawSnow(c,w,h,motion,intensity*snowPower);
-        if(ice)drawFrost(c,w,h,Math.min(1,intensity*icePower));
         if(fog)glow(c,w*.5f,h*.77f,w*.9f,alpha(0xffe4e7fa,(int)(75*fogPower)));
+        // Foreground cold glass: the fingertip warms the film, then moisture returns.
+        float glassFilm=glassTouch?.21f:0f;
+        float frozenSurface=Math.max(glassFilm,icePower);
+        iceGlass.draw(c,width,height,ms,frozenSurface);
     }
     private void disk(Canvas c,float x,float y,float r,int color){p.setShader(null);p.setColor(color);c.drawCircle(x,y,r,p);}
     private void glow(Canvas c,float x,float y,float radius,int color){
@@ -179,24 +190,35 @@ public final class AtmosphereRenderer {
         c.drawCircle(x,y,radius,p);p.setShader(null);
     }
     private void drawAurora(Canvas c,float w,float h,float t,float night){
-        for(int band=0;band<4;band++){
-            float center=h*(.14f+band*.045f);
-            Path path=new Path();path.moveTo(-w*.2f,center);
-            for(int n=0;n<=24;n++){
-                float x=w*(n/20f-.1f);
-                float y=center+(float)Math.sin(n*.31+t*.19f+band*.65f)*h*.045f;
-                path.lineTo(x,y);
+        // Layered curtains: slowly moving harmonics, feathered vertical falloff.
+        for(int curtain=0;curtain<4;curtain++){
+            int col=curtain%3==0?0xff6ef9d9:curtain%3==1?0xff92b8ff:0xffc78eff;
+            float base=h*(.06f+curtain*.032f);
+            for(int layer=0;layer<5;layer++){
+                float strip=h*(.044f+layer*.024f);
+                Path shape=new Path();
+                for(int n=0;n<=32;n++){
+                    float x=w*(n/32f*1.23f-.13f);
+                    float s=(float)Math.sin(n*.27f+t*.13f+curtain*.83f);
+                    float fold=(float)Math.sin(n*.57f-t*.064f+curtain*1.3f);
+                    float y=base+h*.034f*s+h*.024f*fold+layer*h*.006f;
+                    if(n==0)shape.moveTo(x,y);
+                    else shape.lineTo(x,y);
+                }
+                for(int n=32;n>=0;n--){
+                    float x=w*(n/32f*1.23f-.13f);
+                    float s=(float)Math.sin(n*.27f+t*.13f+curtain*.83f);
+                    float fold=(float)Math.sin(n*.57f-t*.064f+curtain*1.3f);
+                    float y=base+h*.034f*s+h*.024f*fold+layer*h*.006f+strip;
+                    shape.lineTo(x,y);
+                }
+                shape.close();
+                p.setStyle(Paint.Style.FILL);
+                p.setShader(new LinearGradient(0,base,0,base+h*.23f,
+                    alpha(col,(int)(night*(26-layer*3))),alpha(col,0),Shader.TileMode.CLAMP));
+                c.drawPath(shape,p);
+                p.setShader(null);
             }
-            for(int n=24;n>=0;n--){
-                float x=w*(n/20f-.1f);
-                float y=center+(float)Math.sin(n*.31+t*.19f+band*.65f)*h*.045f+h*.13f;
-                path.lineTo(x,y);
-            }
-            path.close();
-            int col=band%2==0?0xff7aefc4:0xffbb9aff;
-            p.setShader(new LinearGradient(0,center,0,center+h*.18f,
-                alpha(col,(int)(night*(band%2==0?53:38))),alpha(col,0),Shader.TileMode.CLAMP));
-            c.drawPath(path,p);p.setShader(null);
         }
     }
     private void drawRidge(Canvas c,float w,float h,float t,float day,float eve){
@@ -246,32 +268,28 @@ public final class AtmosphereRenderer {
         }
     }
     private void drawSnow(Canvas c,float w,float h,float t,float amount){
-        int count=(int)(80*amount)+8;
+        if(amount<.001f)return;
+        int count=Math.min(rx.length,Math.max(3,(int)(100*amount)));
+        p.setStyle(Paint.Style.FILL);
         for(int i=0;i<count;i++){
-            float x=((rx[i]+(float)Math.sin(t*.42f+ry[i]*7)*.025f+1)%1f)*w;
-            float y=((ry[i]+t*.021f*rv[i])%1f)*h;
-            p.setColor(alpha(0xfff5fbff,(int)(58+95*rs[i])));
-            c.drawCircle(x,y,Math.max(.8f,w*.0028f*rs[i]),p);
-        }
-    }
-    private void drawFrost(Canvas c,float w,float h,float amount){
-        p.setStyle(Paint.Style.STROKE);p.setStrokeCap(Paint.Cap.ROUND);
-        for(int edge=0;edge<2;edge++){
-            float x=edge==0?w*.022f:w*.978f;
-            for(int branch=0;branch<7;branch++){
-                float y=h*(.11f+branch*.12f);
-                float dir=edge==0?1:-1;
-                float length=w*(.035f+.047f*rs[branch+10])*amount;
-                p.setColor(alpha(0xffedf8ff,(int)(32+43*amount)));
-                p.setStrokeWidth(Math.max(.6f,w*.0015f));
-                c.drawLine(x,y,x+dir*length,y-h*.022f,p);
-                for(int twig=1;twig<=3;twig++){
-                    float bx=x+dir*length*twig/4f,by=y-h*.022f*twig/4f;
-                    c.drawLine(bx,by,bx+dir*length*.19f,by-h*.017f,p);
-                    c.drawLine(bx,by,bx+dir*length*.15f,by+h*.017f,p);
-                }
+            float depth=.45f+rs[i]*.6f;
+            float slow=t*(.013f+.022f*rv[i])*depth;
+            float fall=(ry[i]+slow)%1.11f;
+            float gust=wind*t*.0065f*depth;
+            float sway=(float)Math.sin(t*.3f+i*.82f)*.028f*depth;
+            float x=((rx[i]+gust+sway+2)%1.08f)*w;
+            float y=(fall-.06f)*h;
+            float radius=Math.max(.65f,w*.0017f*depth);
+            int opacity=(int)(Math.max(0,Math.min(1,amount))*(70+95*depth));
+            p.setColor(alpha(0xffeffaff,opacity));
+            c.drawCircle(x,y,radius,p);
+            if(i%13==0&&depth>.7f){
+                p.setStyle(Paint.Style.STROKE);
+                p.setStrokeWidth(Math.max(.55f,radius*.45f));
+                c.drawLine(x-radius*2,y,x+radius*2,y,p);
+                c.drawLine(x,y-radius*2,x,y+radius*2,p);
+                p.setStyle(Paint.Style.FILL);
             }
         }
-        p.setStyle(Paint.Style.FILL);
     }
 }

@@ -80,6 +80,45 @@ public final class MainActivity extends Activity {
         LinearLayout.LayoutParams pm=params(-1,265);pm.topMargin=dp(13);content.addView(preview,pm);
         TextView hint=text("Предпросмотр реагирует на все настройки. Применение обоев подтверждает Android.",12,false);
         hint.setTextColor(MUTED);add(content,hint,-2);
+        TextView touchHint=text("Проведи пальцем по предпросмотру: лёд тает, стекло запотевает и медленно замерзает снова.",12,false);
+        touchHint.setTextColor(0xffc9ecf5);
+        add(content,touchHint,-2);
+        LinearLayout shortcuts=new LinearLayout(this);
+        shortcuts.setOrientation(LinearLayout.HORIZONTAL);
+        Button icy=action("❄ Ледяная ночь",()->{
+            Config.put(this,"weather_mode","ice");
+            Config.put(this,"time_mode","night");
+            Config.put(this,"aurora",true);
+            Config.put(this,"galaxy",true);
+            Config.put(this,"comets",true);
+            Config.put(this,"ice_enabled",true);
+            Config.put(this,"snow_enabled",true);
+            refreshModes();
+            preview.reload();
+        });
+        Button clear=action("◈ Живое стекло",()->{
+            Config.put(this,"weather_mode","clear");
+            Config.put(this,"time_mode","auto");
+            refreshModes();preview.reload();
+        });
+        LinearLayout.LayoutParams left=new LinearLayout.LayoutParams(0,dp(48),1);
+        LinearLayout.LayoutParams right=new LinearLayout.LayoutParams(0,dp(48),1);
+        right.leftMargin=dp(8);
+        shortcuts.addView(icy,left);
+        shortcuts.addView(clear,right);
+        add(content,shortcuts,48);
+        add(content,action("✧  Полноэкранное ледяное стекло · рисовать пальцем",()->{
+            Config.put(this,"weather_mode","ice");
+            Config.put(this,"time_mode","night");
+            Config.put(this,"aurora",true);
+            Config.put(this,"galaxy",true);
+            Config.put(this,"comets",true);
+            Config.put(this,"ice_enabled",true);
+            Config.put(this,"snow_enabled",true);
+            refreshModes();
+            preview.reload();
+            startActivity(new Intent(this,IceShowcaseActivity.class));
+        }),53);
 
         section(content,"Применение темы","Android спросит подтверждение, системные обои не заменяются автоматически.");
         LinearLayout activate=surface();add(content,activate,-2);
@@ -98,6 +137,19 @@ public final class MainActivity extends Activity {
         LinearLayout times=vertical();add(content,times,-2);
         modeRow(times,false,new String[]{"auto","morning","day"},new String[]{"Авто","Утро","День"});
         modeRow(times,false,new String[]{"evening","night"},new String[]{"Вечер","Ночь"});
+
+        section(content,"Лёд, звёзды и космос","Независимые эффекты. Прикосновения оставляют след тепла на стекле.");
+        LinearLayout iceControls=surface();
+        add(content,iceControls,-2);
+        setting(iceControls,"Морозные узоры","ice_enabled",true);
+        setting(iceControls,"Снег и снежинки","snow_enabled",true);
+        setting(iceControls,"Галактика и звёздная пыль","galaxy",true);
+        setting(iceControls,"Кометы и светящиеся хвосты","comets",true);
+        setting(iceControls,"Тепло пальца · рисовать по льду","touch_melt",true);
+        setting(iceControls,"Запотевание обычного стекла","glass_touch",true);
+        slider(iceControls,"Интенсивность инея","frost_strength",.92f);
+        scaledSlider(iceControls,"Восстановление морозного рисунка","frost_recovery",1f,.4f,2.6f);
+        scaledSlider(iceControls,"Радиус следа пальца","touch_radius",.057f,.025f,.12f);
 
         section(content,"Тонкая настройка",null);
         LinearLayout sliders=surface();add(content,sliders,-2);
@@ -172,6 +224,23 @@ public final class MainActivity extends Activity {
             }
             @Override public void onStartTrackingTouch(SeekBar s){}
             @Override public void onStopTrackingTouch(SeekBar s){}
+        });
+    }
+    private void scaledSlider(LinearLayout box,String label,String key,float def,float low,float high){
+        TextView heading=text(label,13,true);
+        LinearLayout.LayoutParams hp=params(-1,-2);hp.topMargin=dp(8);
+        box.addView(heading,hp);
+        SeekBar bar=new SeekBar(this);
+        bar.setMax(100);
+        bar.setProgress(Math.max(0,Math.min(100,
+            Math.round((Config.number(this,key,def)-low)/(high-low)*100))));
+        box.addView(bar,params(-1,38));
+        bar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){
+            @Override public void onProgressChanged(SeekBar b,int value,boolean user){
+                if(user){Config.put(MainActivity.this,key,low+(high-low)*value/100f);preview.reload();}
+            }
+            @Override public void onStartTrackingTouch(SeekBar b){}
+            @Override public void onStopTrackingTouch(SeekBar b){}
         });
     }
     private void setting(LinearLayout parent,String label,String key,boolean def){

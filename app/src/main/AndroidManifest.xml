@@ -19,6 +19,9 @@
             <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
         </activity>
         <activity android:name=".MainActivity" android:exported="true" android:label="Редактор AURA"/>
+        <activity android:name=".IceShowcaseActivity" android:exported="true"
+            android:screenOrientation="unspecified" android:theme="@style/AuraTheme"
+            android:label="Ледяное стекло"/>
         <activity android:name=".HomeActivity" android:exported="true" android:launchMode="singleTask"
             android:theme="@style/AuraHomeTheme" android:label="AURA Home">
             <intent-filter>

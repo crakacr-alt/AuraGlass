@@ -7,6 +7,7 @@ import android.graphics.Path;
 import android.graphics.RectF;
 import android.os.SystemClock;
 import android.view.View;
+import android.view.MotionEvent;
 
 /** Live in-app preview, updated only while the window is visible. */
 public final class AtmospherePreviewView extends View {
@@ -49,6 +50,30 @@ public final class AtmospherePreviewView extends View {
             boolean saver=pm!=null&&pm.isPowerSaveMode();
             postInvalidateDelayed(saver?120:(Config.bool(getContext(),"high_fps",false)?33:55));
         }
+    }
+    @Override public boolean onTouchEvent(MotionEvent event){
+        if(event==null)return false;
+        int type=event.getActionMasked();
+        if(type==MotionEvent.ACTION_DOWN){
+            getParent().requestDisallowInterceptTouchEvent(true);
+            renderer.startTouch(event.getX(),event.getY(),getWidth(),getHeight(),event.getEventTime());
+            invalidate();
+            return true;
+        }
+        if(type==MotionEvent.ACTION_MOVE){
+            for(int i=0;i<event.getHistorySize();i++){
+                renderer.moveTouch(event.getHistoricalX(i),event.getHistoricalY(i),
+                    getWidth(),getHeight(),event.getHistoricalEventTime(i));
+            }
+            renderer.moveTouch(event.getX(),event.getY(),getWidth(),getHeight(),event.getEventTime());
+            invalidate();return true;
+        }
+        if(type==MotionEvent.ACTION_UP||type==MotionEvent.ACTION_CANCEL){
+            renderer.endTouch();
+            getParent().requestDisallowInterceptTouchEvent(false);
+            return true;
+        }
+        return true;
     }
     @Override protected void onAttachedToWindow(){super.onAttachedToWindow();running=true;invalidate();}
     @Override protected void onDetachedFromWindow(){running=false;super.onDetachedFromWindow();}
