@@ -2,6 +2,8 @@ package com.auraglass.app;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.ClipData;
+import android.view.DragEvent;
 import android.content.ComponentName;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -43,6 +45,12 @@ public final class HomeActivity extends Activity {
     private TextView clock,date;
     private WeatherCardView weatherCard;
     private AuraIslandView island;
+    private int homePage=0;
+    private boolean arrangeMode=false;
+    private static final class ShortcutDrag {
+        final int page,slot;
+        ShortcutDrag(int page,int slot){this.page=page;this.slot=slot;}
+    }
     private final Handler timer = new Handler(Looper.getMainLooper());
     private final List<ResolveInfo> applications = new ArrayList<>();
     private final Runnable clockTick = new Runnable(){
@@ -81,6 +89,14 @@ public final class HomeActivity extends Activity {
         return new ComponentName(item.activityInfo.packageName,item.activityInfo.name).flattenToShortString();
     }
     private List<ResolveInfo> favorites(){
+        if(homePage>0){
+            List<ResolveInfo> result=new ArrayList<>();
+            for(String key:WorkspacePager.shortcuts(this,homePage)){
+                ResolveInfo app=findApp(key);
+                if(app!=null)result.add(app);
+            }
+            return result;
+        }
         String saved=Config.str(this,"pinned_apps","");
         if(!Config.prefs(this).contains("pinned_apps")){
             List<ResolveInfo> suggested=selectByPackages(new String[]{
@@ -187,23 +203,21 @@ public final class HomeActivity extends Activity {
         return result;
     }
     private void persistFavorites(List<ResolveInfo> pinned){
-        StringBuilder value=new StringBuilder();
-        for(ResolveInfo item:pinned){
-            if(value.length()>0)value.append(';');
-            value.append(componentKey(item));
-        }
-        Config.put(this,"pinned_apps",value.toString());
+        List<String> keys=new ArrayList<>();
+        for(ResolveInfo item:pinned)keys.add(componentKey(item));
+        WorkspacePager.save(this,homePage,keys);
     }
     private void changeFavorite(ResolveInfo item,boolean add){
         List<ResolveInfo> current=favorites();
         String id=componentKey(item);
         if(add){
-            for(ResolveInfo r:current)if(componentKey(r).equals(id)){
-                Toast.makeText(this,"Уже на главном экране",Toast.LENGTH_SHORT).show();
+            if(WorkspacePager.hasAnywhere(this,id)){
+                Toast.makeText(this,"Приложение уже закреплено на одной из страниц",Toast.LENGTH_SHORT).show();
                 return;
             }
-            if(current.size()+FolderStore.all(this).size()>=8){
-                Toast.makeText(this,"На главном экране восемь мест. Сначала уберите ярлык.",Toast.LENGTH_SHORT).show();
+            int max=WorkspacePager.SLOTS-(homePage==0?FolderStore.all(this).size():0);
+            if(current.size()>=max){
+                Toast.makeText(this,"Страница заполнена. Можно добавить новую.",Toast.LENGTH_SHORT).show();
                 return;
             }
             current.add(item);
@@ -228,16 +242,11 @@ public final class HomeActivity extends Activity {
         return entries;
     }
     private void removePinIfPresent(ResolveInfo app){
-        List<ResolveInfo> current=favorites();
-        if(current.removeIf(item->componentKey(item).equals(componentKey(app))))
-            persistFavorites(current);
+        WorkspacePager.removeEverywhere(this,componentKey(app));
     }
     private void createFolder(ResolveInfo first){
-        List<ResolveInfo> pinned=favorites();
-        boolean isPinned=false;
-        for(ResolveInfo item:pinned)if(componentKey(item).equals(componentKey(first))){
-            isPinned=true;break;
-        }
+        List<String> pinned=WorkspacePager.shortcuts(this,0);
+        boolean isPinned=pinned.contains(componentKey(first));
         if(FolderStore.all(this).size()>=8||
            !isPinned&&pinned.size()+FolderStore.all(this).size()>=8){
             Toast.makeText(this,"Сначала освободите место на главном экране",Toast.LENGTH_LONG).show();
@@ -332,20 +341,43 @@ public final class HomeActivity extends Activity {
             }).setNegativeButton("Отмена",null).show();
     }
     private final class HomeAdapter extends BaseAdapter {
-        private final List<FolderStore.Folder> folders=FolderStore.all(HomeActivity.this);
+        private final List<FolderStore.Folder> folders=homePage==0?
+            FolderStore.all(HomeActivity.this):Collections.emptyList();
         private final List<ResolveInfo> apps;
         private final AppAdapter appAdapter;
         HomeAdapter(List<ResolveInfo> apps){
             this.apps=apps;this.appAdapter=new AppAdapter(apps,true,false);
         }
-        @Override public int getCount(){return Math.min(8,folders.size()+apps.size());}
+        @Override public int getCount(){return WorkspacePager.SLOTS;}
         @Override public Object getItem(int position){
-            return position<folders.size()?folders.get(position):apps.get(position-folders.size());
+            if(position<folders.size())return folders.get(position);
+            int index=position-folders.size();
+            return index<apps.size()?apps.get(index):null;
         }
         @Override public long getItemId(int position){return position;}
         @Override public View getView(int position,View recycled,ViewGroup parent){
-            if(position>=folders.size())
-                return appAdapter.getView(position-folders.size(),recycled,parent);
+            if(position>=folders.size()){
+                int item=position-folders.size();
+                if(item<apps.size()){
+                    View cell=appAdapter.getView(item,recycled,parent);
+                    if(arrangeMode){
+                        cell.setOnLongClickListener(v->startShortcutDrag(v,position));
+                        cell.setOnDragListener((v,event)->dropOnSlot(event,position));
+                    }
+                    return cell;
+                }
+                LinearLayout blank=new LinearLayout(HomeActivity.this);
+                blank.setGravity(Gravity.CENTER);
+                blank.setMinimumHeight(dp(72));
+                if(arrangeMode){
+                    TextView plus=label("＋",22,false);
+                    plus.setGravity(Gravity.CENTER);
+                    plus.setTextColor(0x80d5e6ff);
+                    blank.addView(plus,new LinearLayout.LayoutParams(dp(48),dp(48)));
+                }
+                blank.setOnDragListener((v,event)->dropOnSlot(event,position));
+                return blank;
+            }
             FolderStore.Folder folder=folders.get(position);
             LinearLayout cell=new LinearLayout(HomeActivity.this);
             cell.setOrientation(LinearLayout.VERTICAL);cell.setGravity(Gravity.CENTER);
@@ -371,8 +403,124 @@ public final class HomeActivity extends Activity {
             cell.addView(caption,new LinearLayout.LayoutParams(-1,dp(22)));
             cell.setOnClickListener(v->openFolder(folder));
             cell.setOnLongClickListener(v->{editFolder(folder);return true;});
+            cell.setOnDragListener((v,event)->dropOnSlot(event,position));
             return cell;
         }
+    }
+    private boolean startShortcutDrag(View cell,int slot){
+        if(!arrangeMode)return false;
+        ClipData data=ClipData.newPlainText("aura-shortcut","workspace");
+        ShortcutDrag drag=new ShortcutDrag(homePage,slot);
+        return cell.startDragAndDrop(data,new View.DragShadowBuilder(cell),drag,0);
+    }
+    private boolean dropOnSlot(DragEvent event,int destinationSlot){
+        Object state=event.getLocalState();
+        if(!(state instanceof ShortcutDrag))return false;
+        ShortcutDrag drag=(ShortcutDrag)state;
+        switch(event.getAction()){
+            case DragEvent.ACTION_DRAG_STARTED:return true;
+            case DragEvent.ACTION_DRAG_ENTERED:return true;
+            case DragEvent.ACTION_DRAG_EXITED:return true;
+            case DragEvent.ACTION_DROP:{
+                int folderCount=homePage==0?FolderStore.all(this).size():0;
+                int sourceFolderCount=drag.page==0?FolderStore.all(this).size():0;
+                int sourceIndex=drag.slot-sourceFolderCount;
+                if(sourceIndex<0)return false;
+                List<String> from=WorkspacePager.shortcuts(this,drag.page);
+                if(sourceIndex>=from.size())return false;
+                String key=from.get(sourceIndex);
+                if(destinationSlot<folderCount){
+                    FolderStore.Folder folder=FolderStore.all(this).get(destinationSlot);
+                    if(!FolderStore.add(this,folder.id,key))return false;
+                    WorkspacePager.removeEverywhere(this,key);
+                    showHome();
+                    return true;
+                }
+                int destIndex=destinationSlot-folderCount;
+                int capacity=WorkspacePager.SLOTS-folderCount;
+                boolean moved=WorkspacePager.move(this,drag.page,sourceIndex,homePage,destIndex,capacity);
+                if(moved)showHome();
+                return moved;
+            }
+            case DragEvent.ACTION_DRAG_ENDED:return true;
+        }
+        return true;
+    }
+    private void changePage(int requested){
+        if(requested<0||requested>=WorkspacePager.pageCount(this))return;
+        homePage=requested;
+        showHome();
+    }
+    private void addPage(){
+        if(!WorkspacePager.addPage(this)){
+            Toast.makeText(this,"Максимум четыре страницы",Toast.LENGTH_SHORT).show();
+            return;
+        }
+        homePage=WorkspacePager.pageCount(this)-1;
+        showHome();
+    }
+    private void removeEmptyLastPage(){
+        if(homePage!=WorkspacePager.pageCount(this)-1 ||
+           homePage==0 || !WorkspacePager.deleteLastEmpty(this)){
+            Toast.makeText(this,"Можно удалить только последнюю пустую страницу",Toast.LENGTH_SHORT).show();
+            return;
+        }
+        homePage=Math.max(0,homePage-1);
+        showHome();
+    }
+    private void moveShortcutToOtherPage(ResolveInfo app){
+        int pages=WorkspacePager.pageCount(this);
+        String[] labels=new String[pages];
+        for(int i=0;i<pages;i++)labels[i]=(i==homePage?"✓ ":"")+"Страница "+(i+1);
+        new AlertDialog.Builder(this).setTitle("Переместить ярлык")
+            .setItems(labels,(dialog,which)->{
+                if(which==homePage)return;
+                List<String> source=WorkspacePager.shortcuts(this,homePage);
+                int from=source.indexOf(componentKey(app));
+                int capacity=WorkspacePager.SLOTS-(which==0?FolderStore.all(this).size():0);
+                boolean moved=WorkspacePager.move(this,homePage,from,which,
+                    WorkspacePager.shortcuts(this,which).size(),capacity);
+                if(moved){homePage=which;showHome();}
+                else Toast.makeText(this,"На этой странице нет места",Toast.LENGTH_SHORT).show();
+            })
+            .setNegativeButton("Отмена",null)
+            .show();
+    }
+    private TextView pageControl(String value,int width,Runnable click){
+        TextView control=label(value,13,true);
+        control.setGravity(Gravity.CENTER);
+        control.setContentDescription(value);
+        control.setOnClickListener(v->click.run());
+        control.setMinHeight(dp(38));
+        return control;
+    }
+    private void showPageStrip(LinearLayout vertical){
+        LinearLayout strip=new LinearLayout(this);
+        strip.setGravity(Gravity.CENTER_VERTICAL);
+        TextView left=pageControl("❮",38,()->changePage(homePage-1));
+        strip.addView(left,new LinearLayout.LayoutParams(dp(38),dp(39)));
+        TextView counter=pageControl("Страница "+(homePage+1)+" / "+
+            WorkspacePager.pageCount(this),0,()->{
+                if(arrangeMode)new AlertDialog.Builder(this)
+                    .setTitle("Удалить пустую страницу?")
+                    .setNegativeButton("Отмена",null)
+                    .setPositiveButton("Удалить",(d,w)->removeEmptyLastPage())
+                    .show();
+            });
+        strip.addView(counter,new LinearLayout.LayoutParams(0,dp(39),1));
+        TextView right=pageControl("❯",38,()->changePage(homePage+1));
+        strip.addView(right,new LinearLayout.LayoutParams(dp(38),dp(39)));
+        TextView add=pageControl("＋",42,this::addPage);
+        add.setContentDescription("Добавить страницу");
+        strip.addView(add,new LinearLayout.LayoutParams(dp(42),dp(39)));
+        TextView edit=pageControl(arrangeMode?"✓ Готово":"Изменить",75,()->{
+            arrangeMode=!arrangeMode;showHome();
+        });
+        edit.setContentDescription("Режим перемещения ярлыков");
+        strip.addView(edit,new LinearLayout.LayoutParams(dp(75),dp(39)));
+        LinearLayout.LayoutParams layout=new LinearLayout.LayoutParams(-1,dp(42));
+        layout.topMargin=dp(8);
+        vertical.addView(strip,layout);
     }
     private void showHome(){
         if(island!=null)island.pause();
@@ -428,10 +576,11 @@ public final class HomeActivity extends Activity {
         sp.topMargin=dp(15);vertical.addView(search,sp);
 
         vertical.addView(new View(this),new LinearLayout.LayoutParams(-1,0,1));
-
+        showPageStrip(vertical);
         GlassPanel shortPanel=new GlassPanel(this);
         shortPanel.setPadding(dp(8),dp(8),dp(8),dp(5));
         GridView favorites=icons(favorites(),4,true,false);
+        favorites.setContentDescription("Ярлыки страницы "+(homePage+1));
         shortPanel.addView(favorites,new FrameLayout.LayoutParams(-1,dp(153)));
         vertical.addView(shortPanel,new LinearLayout.LayoutParams(-1,dp(167)));
 
@@ -569,7 +718,7 @@ public final class HomeActivity extends Activity {
             cell.setOnLongClickListener(v->{
                 String[] options;
                 if(dock)options=new String[]{"Сдвинуть влево","Сдвинуть вправо","Убрать из дока"};
-                else if(onHome)options=new String[]{"Сдвинуть влево","Сдвинуть вправо","Убрать с главного","Создать папку","Добавить в папку"};
+                else if(onHome)options=new String[]{"Сдвинуть влево","Сдвинуть вправо","Убрать с главного","Создать папку","Добавить в папку","На другую страницу"};
                 else options=new String[]{"Закрепить на главном","Добавить в док","Создать папку","Добавить в папку"};
                 new AlertDialog.Builder(HomeActivity.this)
                     .setTitle(entry.loadLabel(getPackageManager()))
@@ -582,6 +731,7 @@ public final class HomeActivity extends Activity {
                                 else changeFavorite(entry,false);
                             }else if(which==3)createFolder(entry);
                             else if(which==4)chooseFolder(entry);
+                            else if(which==5)moveShortcutToOtherPage(entry);
                         }else if(which==0)changeFavorite(entry,true);
                         else if(which==1)changeDock(entry,true);
                         else if(which==2)createFolder(entry);
