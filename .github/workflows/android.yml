@@ -73,7 +73,11 @@ jobs:
             mkdir -p screenshots
             adb install -r app-debug.apk
             adb logcat -c
-            sleep 12
+            # Avoid AOSP Quickstep launching as default Home while another launcher
+            # is being rendered and tested; it produced a system-ANR modal in QA.
+            adb shell cmd role add-role-holder android.app.role.HOME com.auraglass.app
+            adb shell am force-stop com.android.launcher3 || true
+            sleep 7
             adb shell input keyevent 82
             adb shell am start -W -n com.auraglass.app/.SetupActivity
             sleep 5
@@ -104,10 +108,17 @@ jobs:
             adb shell cmd role add-role-holder android.app.role.HOME com.auraglass.app
             adb shell cmd role get-role-holders android.app.role.HOME > screenshots/home-role.txt
             adb shell dumpsys package com.auraglass.app > screenshots/package.txt
+            adb shell dumpsys gfxinfo com.auraglass.app > screenshots/gfxinfo.txt || true
+            adb logcat -d -v threadtime > screenshots/device-logcat.txt
             grep -q "AuraEventListener" screenshots/package.txt
             grep -q "AuraWallpaperService" screenshots/package.txt
             grep -q "com.auraglass.app" screenshots/home-role.txt
             ! adb logcat -d -s AndroidRuntime:E | grep -F "Process: com.auraglass.app"
+            # A blocking system dialog invalidates visual acceptance, even if AURA survived.
+            if grep -E 'ANR in (com\\.android\\.launcher3|com\\.google\\.android\\.apps\\.nexuslauncher)' screenshots/device-logcat.txt; then
+              echo "System launcher ANR invalidated the screen capture" >&2
+              exit 1
+            fi
             test "$(stat -c %s screenshots/02-island-collapsed.png)" -gt 90000
             echo "✓ core views and Island opened in emulator"
       - name: Upload visual evidence
