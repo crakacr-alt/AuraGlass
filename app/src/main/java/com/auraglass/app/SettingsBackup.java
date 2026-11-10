@@ -39,6 +39,7 @@ public final class SettingsBackup {
         "snow_accumulation","haptics","parallax","parallax_intensity",
         "island_enabled","island_show_caller","island_show_notification_text",
         "pinned_apps","dock_apps","home_folders",
+        "home_pages_count","home_page_1","home_page_2","home_page_3",
         "manual_city","weather_city","city_name","city",
         "weather_provider","location_mode","units","language",
         "updates_on_open","updates_notification"

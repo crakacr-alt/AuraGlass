@@ -48,6 +48,45 @@ public final class QaEntryActivity extends Activity {
             android.util.Log.i("AURA_QA",success?"FOLDERS_OK":"FOLDERS_FAILED");
             finish();return;
         }
+        if("pages".equals(target)){
+            String old0=Config.str(this,"pinned_apps","");
+            float oldCount=Config.number(this,"home_pages_count",1f);
+            String old1=Config.str(this,"home_page_1","");
+            String old2=Config.str(this,"home_page_2","");
+            boolean okay=false;
+            try{
+                if(WorkspacePager.pageCount(this)==1){
+                    boolean first=WorkspacePager.addPage(this);
+                    boolean second=WorkspacePager.addPage(this);
+                    boolean a=WorkspacePager.add(this,1,"aura.qa/.Alpha",8);
+                    boolean b=WorkspacePager.add(this,1,"aura.qa/.Beta",8);
+                    boolean rejected= !WorkspacePager.add(this,2,"aura.qa/.Alpha",8);
+                    boolean reordered=WorkspacePager.move(this,1,0,1,1,8);
+                    boolean ordered=WorkspacePager.shortcuts(this,1).get(0)
+                        .equals("aura.qa/.Beta");
+                    boolean moved=WorkspacePager.move(this,1,1,2,0,8);
+                    boolean transferred=WorkspacePager.shortcuts(this,2)
+                        .contains("aura.qa/.Alpha");
+                    boolean cleared=WorkspacePager.removeEverywhere(this,"aura.qa/.Alpha");
+                    boolean removedLast=WorkspacePager.deleteLastEmpty(this);
+                    boolean cleaned=WorkspacePager.removeEverywhere(this,"aura.qa/.Beta");
+                    boolean removedNext=WorkspacePager.deleteLastEmpty(this);
+                    okay=first&&second&&a&&b&&rejected&&reordered&&ordered&&moved&&
+                        transferred&&cleared&&removedLast&&cleaned&&removedNext&&
+                        WorkspacePager.pageCount(this)==1;
+                }
+            }catch(Exception error){
+                android.util.Log.e("AURA_QA","WORKSPACE_SMOKE_EXCEPTION",error);
+            }finally{
+                // The check is reversible and never keeps QA shortcuts.
+                Config.put(this,"pinned_apps",old0);
+                Config.put(this,"home_pages_count",oldCount);
+                Config.put(this,"home_page_1",old1);
+                Config.put(this,"home_page_2",old2);
+            }
+            android.util.Log.i("AURA_QA",okay?"PAGES_OK":"PAGES_FAILED");
+            finish();return;
+        }
         if("diagnostics".equals(target))page=DiagnosticsActivity.class;
         else if("widgets".equals(target))page=WidgetBoardActivity.class;
         else if("ice".equals(target))page=IceShowcaseActivity.class;

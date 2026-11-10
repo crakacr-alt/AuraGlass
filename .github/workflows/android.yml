@@ -92,6 +92,10 @@ jobs:
             sleep 1
             adb logcat -d -s AURA_QA:I > screenshots/folder-crud.txt
             grep -q 'FOLDERS_OK' screenshots/folder-crud.txt
+            adb shell am start -W -n com.auraglass.app/.QaEntryActivity --es target pages
+            sleep 1
+            adb logcat -d -s AURA_QA:I > screenshots/workspace-pages.txt
+            grep -q 'PAGES_OK' screenshots/workspace-pages.txt
             adb shell am start -W -n com.auraglass.app/.QaEntryActivity --es target diagnostics
             sleep 3
             adb shell pidof com.auraglass.app
