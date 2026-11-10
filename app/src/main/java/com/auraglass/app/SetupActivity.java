@@ -138,6 +138,28 @@ public final class SetupActivity extends Activity {
         addButton(personalize, "Открыть редактор темы", () ->
                 startActivity(new Intent(this, MainActivity.class)));
         addButton(personalize, "Перепроверить состояние", this::updateStatus);
+        LinearLayout islandSection = section(main,"04 · AURA Island",
+            "Музыка, звонки, уведомления, аудиоволна и микшер на рабочем столе.");
+        android.widget.Switch islandToggle=new android.widget.Switch(this);
+        islandToggle.setText("Показывать AURA Island");
+        islandToggle.setTextColor(Color.WHITE);
+        islandToggle.setChecked(Config.bool(this,"island_enabled",true));
+        islandToggle.setOnCheckedChangeListener((button,checked)->
+            Config.put(this,"island_enabled",checked));
+        islandSection.addView(islandToggle,new LinearLayout.LayoutParams(-1,dp(49)));
+        android.widget.Switch callerToggle=new android.widget.Switch(this);
+        callerToggle.setText("Показывать имя и номер звонящего");
+        callerToggle.setTextColor(Color.WHITE);
+        callerToggle.setTextSize(13);
+        callerToggle.setChecked(Config.bool(this,"island_show_caller",false));
+        callerToggle.setOnCheckedChangeListener((button,checked)->
+            Config.put(this,"island_show_caller",checked));
+        islandSection.addView(callerToggle,new LinearLayout.LayoutParams(-1,dp(49)));
+        addButton(islandSection,"Разрешить доступ к уведомлениям",()->{
+            try{startActivity(new Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS));}
+            catch(RuntimeException ignored){}
+        });
+        addButton(islandSection,"Открыть микшер громкости",()->AuraAudioMixer.show(this));
         gap(main, 20);
         TextView note = title("Тестовая версия. Системная шторка и экран блокировки остаются под управлением One UI.", 11, false);
         note.setTextColor(0xffc7bfd6);

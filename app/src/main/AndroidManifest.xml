@@ -3,11 +3,14 @@
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
     <uses-feature android:name="android.software.live_wallpaper" android:required="false"/>
     <queries>
         <intent><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent>
         <package android:name="com.sec.android.daemonapp"/>
         <package android:name="com.samsung.android.weather"/>
+        <package android:name="com.samsung.android.soundassistant"/>
     </queries>
     <application android:allowBackup="true" android:label="@string/app_name"
         android:icon="@drawable/ic_aura" android:theme="@style/AuraTheme"
@@ -26,6 +29,13 @@
         </activity>
         <activity android:name=".WeatherLaunchActivity" android:exported="false"
             android:theme="@style/AuraTheme"/>
+        <service android:name=".AuraEventListener" android:exported="false"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
+            android:label="AURA Island — события">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService"/>
+            </intent-filter>
+        </service>
         <service android:name=".AuraWallpaperService" android:exported="true"
             android:permission="android.permission.BIND_WALLPAPER" android:label="AURA Live Atmosphere">
             <intent-filter><action android:name="android.service.wallpaper.WallpaperService"/></intent-filter>

@@ -40,6 +40,7 @@ public final class HomeActivity extends Activity {
     private FrameLayout root, drawer;
     private TextView clock,date;
     private WeatherCardView weatherCard;
+    private AuraIslandView island;
     private final Handler timer = new Handler(Looper.getMainLooper());
     private final List<ResolveInfo> applications = new ArrayList<>();
     private final Runnable clockTick = new Runnable(){
@@ -149,13 +150,14 @@ public final class HomeActivity extends Activity {
         Toast.makeText(this,add?"Ярлык добавлен":"Ярлык удалён",Toast.LENGTH_SHORT).show();
     }
     private void showHome(){
-        root.removeAllViews();drawer=null;
+        if(island!=null)island.pause();
+        root.removeAllViews();drawer=null;island=null;
         LinearLayout vertical=new LinearLayout(this);
         vertical.setOrientation(LinearLayout.VERTICAL);
-        vertical.setPadding(dp(17),dp(35),dp(17),dp(18));
+        vertical.setPadding(dp(17),dp(101),dp(17),dp(18));
         vertical.setOnApplyWindowInsetsListener((view,insets)->{
             int insetBottom=insets.getSystemWindowInsetBottom();
-            view.setPadding(dp(17),dp(35),dp(17),Math.max(dp(18),dp(12)+insetBottom));
+            view.setPadding(dp(17),Math.max(dp(101),insets.getSystemWindowInsetTop()+dp(68)),dp(17),Math.max(dp(18),dp(12)+insetBottom));
             return insets;
         });
         root.addView(vertical,new FrameLayout.LayoutParams(-1,-1));
@@ -222,6 +224,19 @@ public final class HomeActivity extends Activity {
         }
         dock.addView(icons(common,5,false,true),new FrameLayout.LayoutParams(-1,dp(71)));
         vertical.addView(dock,new LinearLayout.LayoutParams(-1,dp(80)));
+        if(Config.bool(this,"island_enabled",true)){
+            island=new AuraIslandView(this);
+            FrameLayout.LayoutParams islandLp=new FrameLayout.LayoutParams(-1,dp(57),Gravity.TOP|Gravity.CENTER_HORIZONTAL);
+            islandLp.leftMargin=dp(39);islandLp.rightMargin=dp(39);islandLp.topMargin=dp(34);
+            root.addView(island,islandLp);
+            island.setOnApplyWindowInsetsListener((v,insets)->{
+                FrameLayout.LayoutParams lp=(FrameLayout.LayoutParams)v.getLayoutParams();
+                int safeTop=Math.max(dp(34),insets.getSystemWindowInsetTop()+dp(5));
+                if(lp.topMargin!=safeTop){lp.topMargin=safeTop;v.setLayoutParams(lp);}
+                return insets;
+            });
+            island.requestApplyInsets();
+        }
         updateClock();
     }
     private GridView icons(List<ResolveInfo> items,int columns,boolean pinnable,boolean dock){
@@ -347,8 +362,11 @@ public final class HomeActivity extends Activity {
             if(weatherCard!=null)weatherCard.refresh();
         });
         if(weatherCard!=null)weatherCard.refresh();
+        if((island!=null)!=Config.bool(this,"island_enabled",true))showHome();
+        if(island!=null)island.resume();
     }
     @Override protected void onPause(){
+        if(island!=null)island.pause();
         timer.removeCallbacks(clockTick);super.onPause();
     }
     @Override public void onBackPressed(){

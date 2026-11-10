@@ -16,6 +16,20 @@ The **app icon opens a dedicated setup screen** with separate controls and statu
 
 > The v0.1 alpha was merely a working compile and lacked a proper first-run activation experience. Please **uninstall that test version** before trying v0.2: GitHub runners generate different debug-signing keys.
 
+## AURA Island — development implementation
+
+The development branch now includes the first **real media/event integration**:
+
+- Compact glass capsule on **AURA Home**; tap or swipe to expand/collapse, long-press for configuration
+- Real media title, artist, source app, artwork, playback state, seek bar, previous/pause/next where supported by the source MediaSession
+- Optional FFT audio-reactive spectrum through Android's `Visualizer(0)` when the user explicitly grants `RECORD_AUDIO`. Without capture there is a calm stationary waveform — not simulated bass
+- Call notifications where the phone app exposes them: caller label and optional details (hidden by default), notification-provided actions only; opening the system phone call UI
+- Actual five-channel AudioManager system volume mixer; **not** a universal per-app sound mixer. Samsung SoundAssistant can be opened when available
+- Local `NotificationListenerService` consent; no notification content or FFT bytes sent to servers
+- Currently limited to AURA Home. Other-app overlay, independent per-app audio and true direct call mute/hang-up require separate OEM/system support or a default-dialer implementation and are **not promised or enabled**
+
+The GitHub Actions pipeline builds and smoke-tests the development APK **without publishing a public prerelease**. A stable release requires a persistent private signing key and real testing on Samsung before publication. See [RELEASE_PLAN.md](RELEASE_PLAN.md), [SIGNING.md](SIGNING.md), and [AURA_ISLAND_SPEC.md](AURA_ISLAND_SPEC.md).
+
 ## Prototype capabilities
 
 - Native home screen with app drawer, installed apps and animated weather card
