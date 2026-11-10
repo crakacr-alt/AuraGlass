@@ -34,6 +34,8 @@ public final class IceGlassLayer {
     private final Paint sparklePaint=new Paint(Paint.ANTI_ALIAS_FLAG);
     private long lastUpdate=0;
     private long lastBitmap=0;
+    private long lastTouchedGlobal=0;
+    private float lastStrength=-1;
     private float intensity=0.7f;
     private float recovery=1.0f;
     private float touchRadius=0.055f;
@@ -134,6 +136,7 @@ public final class IceGlassLayer {
     public void stroke(float x,float y,int width,int height,long now){
         if(!interaction||width<=0||height<=0)return;
         lastW=width;lastH=height;
+        lastTouchedGlobal=now;
         float nx=Math.max(0,Math.min(1,x/width));
         float ny=Math.max(0,Math.min(1,y/height));
         float px=nx*WIDTH,py=ny*HEIGHT;
@@ -238,12 +241,18 @@ public final class IceGlassLayer {
         }
         mask.setPixels(pixels,0,WIDTH,0,0,WIDTH,HEIGHT);
         lastBitmap=now;
+        lastStrength=sceneStrength;
     }
 
     public void draw(Canvas canvas,int width,int height,long now,float sceneStrength){
         if(sceneStrength<=.002f||intensity<=0||width<=0||height<=0)return;
-        thermalStep(now);
-        if(lastBitmap==0||now-lastBitmap>=REBUILD_MS)
+        boolean activeCooling=lastTouchedGlobal>0&&now-lastTouchedGlobal<11500;
+        if(activeCooling)thermalStep(now);
+        else lastUpdate=now;
+        // Stable frost is cached. Only a finger trail or a weather crossfade
+        // should wake the expensive pixel field; sky/star animation is separate.
+        if(lastBitmap==0||Math.abs(sceneStrength-lastStrength)>.012f||
+            activeCooling&&now-lastBitmap>=REBUILD_MS)
             rebuild(now,sceneStrength);
         destination.set(0,0,width,height);
         bitmapPaint.setAlpha(255);
