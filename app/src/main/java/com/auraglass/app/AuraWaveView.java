@@ -17,7 +17,10 @@ public final class AuraWaveView extends View {
     private Shader gradient;
     private int shaderHeight=-1;
     private boolean actualAudio=false;
-    public AuraWaveView(Context context){super(context);}
+    private final RenderBudget budget;
+    public AuraWaveView(Context context){
+        super(context);budget=new RenderBudget(context);
+    }
     public void setBands(float[] levels){
         if(levels==null)return;
         actualAudio=true;
@@ -33,6 +36,7 @@ public final class AuraWaveView extends View {
     }
     public boolean isRealAudio(){return actualAudio;}
     @Override protected void onDraw(Canvas c){
+        long start=android.os.SystemClock.uptimeMillis();
         super.onDraw(c);
         float width=getWidth(),height=getHeight();
         if(width<=0||height<=0)return;
@@ -53,14 +57,9 @@ public final class AuraWaveView extends View {
             c.drawRoundRect(barRect,bar/2,bar/2,paint);
         }
         paint.setShader(null);
-        if(actualAudio&&getWindowVisibility()==VISIBLE){
-            android.os.PowerManager power=(android.os.PowerManager)
-                getContext().getSystemService(Context.POWER_SERVICE);
-            boolean saver=power!=null&&power.isPowerSaveMode();
-            float hz=RefreshRateSupport.requestedHz(getContext());
-            int delay=(int)Math.max(8,Math.round(1000f/Math.max(30f,hz)));
-            postInvalidateDelayed(saver?65:
-                Config.bool(getContext(),"reduce_motion",false)?50:delay);
+        if(actualAudio&&getWindowVisibility()==VISIBLE&&isShown()){
+            postInvalidateDelayed(budget.nextDelay(start,
+                android.os.SystemClock.uptimeMillis()-start));
         }
     }
 }

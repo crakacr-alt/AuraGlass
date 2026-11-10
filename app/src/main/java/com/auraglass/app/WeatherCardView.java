@@ -19,18 +19,26 @@ public final class WeatherCardView extends View {
     private final Paint ripplePaint=new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Path clip=new Path();
     private final SnowEdgeLayer snowEdge=new SnowEdgeLayer();
+    private final RenderBudget budget;
+    private WeatherRepository.Snapshot cachedWeather;
+    private long weatherReadAt;
     public WeatherCardView(Context c){
-        super(c);
+        super(c);budget=new RenderBudget(c);
         setOnClickListener(v->{if(!SamsungWeather.open(getContext()))getContext().startActivity(
             new android.content.Intent(getContext(),MainActivity.class).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK));});
     }
     @Override protected void onDraw(Canvas c){
+        long frameStart=SystemClock.uptimeMillis();
         super.onDraw(c);
-        painter.draw(c,getContext(),getWidth(),getHeight(),WeatherRepository.read(getContext()),
-            (SystemClock.uptimeMillis()-started)/1000f);
         long now=SystemClock.uptimeMillis();
+        if(cachedWeather==null||now-weatherReadAt>30000){
+            cachedWeather=WeatherRepository.read(getContext());
+            weatherReadAt=now;
+        }
+        painter.draw(c,getContext(),getWidth(),getHeight(),cachedWeather,
+            (now-started)/1000f);
         String mode=Config.str(getContext(),"weather_mode","auto");
-        WeatherRepository.Snapshot weather=WeatherRepository.read(getContext());
+        WeatherRepository.Snapshot weather=cachedWeather;
         boolean snow="snow".equals(mode)||"ice".equals(mode)||
             "auto".equals(mode)&&weather.available&&
             (weather.code>=71&&weather.code<=77||weather.code>=85&&weather.code<=86);
@@ -55,14 +63,9 @@ public final class WeatherCardView extends View {
             c.save();c.clipPath(clip);c.drawCircle(fingerX,fingerY,radius,ripplePaint);c.restore();
             ripplePaint.setShader(null);
         }
-        if(running){
-            android.os.PowerManager pm=(android.os.PowerManager)getContext().getSystemService(Context.POWER_SERVICE);
-            boolean saver=pm!=null&&pm.isPowerSaveMode();
-            float hz=RefreshRateSupport.requestedHz(getContext());
-            int delay=(int)Math.max(8,Math.round(1000f/Math.max(30f,hz)));
-            postInvalidateDelayed(saver?95:
-                Config.bool(getContext(),"reduce_motion",false)?66:delay);
-        }
+        if(running&&isShown())
+            postInvalidateDelayed(budget.nextDelay(frameStart,
+                SystemClock.uptimeMillis()-frameStart));
     }
     @Override public boolean onTouchEvent(MotionEvent event){
         int action=event.getActionMasked();
@@ -81,5 +84,8 @@ public final class WeatherCardView extends View {
     }
     @Override protected void onAttachedToWindow(){super.onAttachedToWindow();running=true;invalidate();}
     @Override protected void onDetachedFromWindow(){running=false;super.onDetachedFromWindow();}
-    public void refresh(){invalidate();}
+    public void refresh(){
+        weatherReadAt=0;
+        invalidate();
+    }
 }
