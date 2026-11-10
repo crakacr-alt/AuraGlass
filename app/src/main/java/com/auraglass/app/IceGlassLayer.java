@@ -25,6 +25,7 @@ public final class IceGlassLayer {
     private final float[] heat=new float[COUNT];
     private final float[] heatNext=new float[COUNT];
     private final float[] crystal=new float[COUNT];
+    private final float[] meltDepth=new float[COUNT];
     private final float[] grain=new float[COUNT];
     private final long[] touchedAt=new long[COUNT];
     private final int[] pixels=new int[COUNT];
@@ -62,13 +63,14 @@ public final class IceGlassLayer {
 
     private void stamp(float x,float y,float value){
         int ix=(int)x,iy=(int)y;
-        int radius=Math.max(1,(int)(value*1.45f));
+        // Fine needle nuclei, never broad white branches.
+        int radius=1;
         for(int yy=Math.max(0,iy-radius);yy<=Math.min(HEIGHT-1,iy+radius);yy++){
             for(int xx=Math.max(0,ix-radius);xx<=Math.min(WIDTH-1,ix+radius);xx++){
                 float d=(xx-x)*(xx-x)+(yy-y)*(yy-y);
                 float weight=1f-Math.min(1f,(float)Math.sqrt(d)/(radius+1f));
                 int i=yy*WIDTH+xx;
-                crystal[i]=Math.min(1f,crystal[i]+weight*(value>1.5f?.75f:.36f));
+                crystal[i]=Math.min(1f,crystal[i]+weight*(value>1.2f?.27f:.13f));
             }
         }
     }
@@ -77,13 +79,13 @@ public final class IceGlassLayer {
     private void growBranch(float x,float y,float angle,float step,int count,int level){
         for(int j=0;j<count;j++){
             if(x<0||y<0||x>=WIDTH||y>=HEIGHT)break;
-            stamp(x,y,level==0?2.4f:level==1?1.5f:.65f);
+            stamp(x,y,level==0?1.3f:level==1?.95f:.65f);
             float oldX=x,oldY=y;
             angle+=(rng.nextFloat()-.5f)*.20f;
             x+=(float)Math.cos(angle)*step;
             y+=(float)Math.sin(angle)*step;
-            drawCrystalLine(oldX,oldY,x,y,level==0?1.0f:.6f);
-            if(level<2&&j>2&&j%4==0){
+            drawCrystalLine(oldX,oldY,x,y,level==0?.52f:.31f);
+            if(level<2&&j>2&&j%6==0){
                 float side=(rng.nextBoolean()?1:-1)*(.64f+rng.nextFloat()*.19f);
                 growBranch(x,y,angle+side,step*.67f,
                     Math.max(3,(int)((count-j)*.37f)),level+1);
@@ -102,22 +104,23 @@ public final class IceGlassLayer {
             int y=Math.round(y1+(y2-y1)*f);
             if(x>=0&&x<WIDTH&&y>=0&&y<HEIGHT){
                 int index=y*WIDTH+x;
-                crystal[index]=Math.min(1f,crystal[index]+amount*.68f);
+                crystal[index]=Math.min(1f,crystal[index]+amount*.24f);
             }
         }
     }
 
     private void buildCrystals(){
         for(int edge=0;edge<4;edge++){
-            for(int n=0;n<10;n++){
-                float lane=(n+rng.nextFloat()*.65f)/10f;
+            int colonies=edge<2?6:5;
+            for(int n=0;n<colonies;n++){
+                float lane=(n+rng.nextFloat()*.65f)/colonies;
                 float x,y,theta;
                 if(edge==0){x=1;y=lane*(HEIGHT-1);theta=0;}
                 else if(edge==1){x=WIDTH-2;y=lane*(HEIGHT-1);theta=(float)Math.PI;}
                 else if(edge==2){x=lane*(WIDTH-1);y=1;theta=(float)Math.PI/2;}
                 else{x=lane*(WIDTH-1);y=HEIGHT-2;theta=-(float)Math.PI/2;}
                 theta+=(rng.nextFloat()-.5f)*.68f;
-                growBranch(x,y,theta,1.8f+rng.nextFloat(),23+rng.nextInt(26),0);
+                growBranch(x,y,theta,1.7f+rng.nextFloat()*.75f,19+rng.nextInt(18),0);
             }
         }
     }
@@ -165,7 +168,10 @@ public final class IceGlassLayer {
                 int i=yy*WIDTH+xx;
                 float deposit=Math.max(0,1-d/1.16f);
                 heat[i]=Math.max(heat[i],Math.min(1f,.37f+deposit*.87f));
-                if(d<.92f)touchedAt[i]=now;
+                if(d<.92f){
+                    touchedAt[i]=now;
+                    meltDepth[i]=Math.max(.1f,1-d*.8f);
+                }
             }
         }
     }
@@ -205,19 +211,21 @@ public final class IceGlassLayer {
                 float edge=Math.max(0,1-Math.min(Math.min(fx,1-fx)*4.4f,
                     Math.min(fy,1-fy)*2.9f));
                 edge=edge*edge;
-                float baseMist=.105f+edge*.26f;
-                float dendrite=crystal[i]*(.56f+.26f*edge);
+                float baseMist=.075f+edge*.13f;
+                float dendrite=crystal[i]*(.50f+.20f*edge);
                 float age=touchedAt[i]==0?1000:(now-touchedAt[i])/(1000f*recovery);
                 // Recondensation after 1.3 s, soft droplets followed by crystallization at 3–7 s.
                 float moisture=fade(1.25f,3.2f,age);
-                float frozen=fade(2.7f,7.7f,age);
+                // Deeper melted centers recrystallize later than the cooler rim.
+                float freezeStart=2.2f+1.9f*meltDepth[i];
+                float frozen=fade(freezeStart,freezeStart+3.9f,age);
                 float heatClear=Math.max(0,1-heat[i]*.94f);
                 float mist=baseMist*moisture;
                 float ice=dendrite*frozen;
-                float sparkle=grain[i]>.976f?crystal[i]*.23f*frozen:0;
+                float sparkle=grain[i]>.982f?crystal[i]*.12f*frozen:0;
                 float opacity=(mist+ice+sparkle)*heatClear*strength;
                 if(age<1.15f)opacity*=.04f+.96f*fade(.26f,1.15f,age);
-                opacity=Math.max(0,Math.min(.81f,opacity));
+                opacity=Math.max(0,Math.min(.55f,opacity));
                 int alpha=(int)(opacity*255);
                 // Cooler crystal highlights; subtle translucent condensation grains.
                 int rgb=crystal[i]>.42f?0xffe5f9ff:0xffb8d6e7;
