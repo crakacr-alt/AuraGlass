@@ -38,7 +38,8 @@ public final class SettingsBackup {
         "touch_melt","frost_strength","frost_recovery","touch_radius",
         "snow_accumulation","haptics","parallax","parallax_intensity",
         "island_enabled","island_show_caller","island_show_notification_text",
-        "pinned_apps","manual_city","weather_city","city_name","city",
+        "pinned_apps","dock_apps","home_folders",
+        "manual_city","weather_city","city_name","city",
         "weather_provider","location_mode","units","language",
         "updates_on_open","updates_notification"
     ));

@@ -7,6 +7,7 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
 import android.graphics.Typeface;
 import android.os.Bundle;
 import android.os.Handler;
@@ -200,8 +201,8 @@ public final class HomeActivity extends Activity {
                 Toast.makeText(this,"Уже на главном экране",Toast.LENGTH_SHORT).show();
                 return;
             }
-            if(current.size()>=8){
-                Toast.makeText(this,"На главном экране пока не больше 8 ярлыков",Toast.LENGTH_SHORT).show();
+            if(current.size()+FolderStore.all(this).size()>=8){
+                Toast.makeText(this,"На главном экране восемь мест. Сначала уберите ярлык.",Toast.LENGTH_SHORT).show();
                 return;
             }
             current.add(item);
@@ -212,6 +213,165 @@ public final class HomeActivity extends Activity {
         if(drawer!=null)closeDrawer(false);
         showHome();
         Toast.makeText(this,add?"Ярлык добавлен":"Ярлык удалён",Toast.LENGTH_SHORT).show();
+    }
+    private ResolveInfo findApp(String key){
+        for(ResolveInfo info:applications)if(componentKey(info).equals(key))return info;
+        return null;
+    }
+    private List<ResolveInfo> folderApps(FolderStore.Folder folder){
+        List<ResolveInfo> entries=new ArrayList<>();
+        for(String key:folder.items){
+            ResolveInfo resolved=findApp(key);
+            if(resolved!=null)entries.add(resolved);
+        }
+        return entries;
+    }
+    private void removePinIfPresent(ResolveInfo app){
+        List<ResolveInfo> current=favorites();
+        if(current.removeIf(item->componentKey(item).equals(componentKey(app))))
+            persistFavorites(current);
+    }
+    private void createFolder(ResolveInfo first){
+        List<ResolveInfo> pinned=favorites();
+        boolean isPinned=false;
+        for(ResolveInfo item:pinned)if(componentKey(item).equals(componentKey(first))){
+            isPinned=true;break;
+        }
+        if(FolderStore.all(this).size()>=8||
+           !isPinned&&pinned.size()+FolderStore.all(this).size()>=8){
+            Toast.makeText(this,"Сначала освободите место на главном экране",Toast.LENGTH_LONG).show();
+            return;
+        }
+        EditText name=new EditText(this);
+        name.setSingleLine(true);name.setText("Новая папка");
+        name.setPadding(dp(18),dp(7),dp(18),dp(7));
+        new AlertDialog.Builder(this).setTitle("Создать папку")
+            .setView(name).setNegativeButton("Отмена",null)
+            .setPositiveButton("Создать",(dialog,which)->{
+                if(FolderStore.create(this,name.getText().toString(),componentKey(first))){
+                    removePinIfPresent(first);
+                    if(drawer!=null)closeDrawer(false);
+                    showHome();
+                }else Toast.makeText(this,"Не получилось создать папку",Toast.LENGTH_SHORT).show();
+            }).show();
+    }
+    private void chooseFolder(ResolveInfo app){
+        List<FolderStore.Folder> folders=FolderStore.all(this);
+        if(folders.isEmpty()){createFolder(app);return;}
+        String[] names=new String[folders.size()+1];
+        for(int i=0;i<folders.size();i++)names[i]=folders.get(i).name;
+        names[folders.size()]="＋ Создать новую папку";
+        new AlertDialog.Builder(this).setTitle("Добавить в папку")
+            .setItems(names,(dialog,which)->{
+                if(which==folders.size()){createFolder(app);return;}
+                if(FolderStore.add(this,folders.get(which).id,componentKey(app))){
+                    removePinIfPresent(app);
+                    if(drawer!=null)closeDrawer(false);
+                    showHome();
+                }else Toast.makeText(this,"Папка заполнена",Toast.LENGTH_SHORT).show();
+            }).setNegativeButton("Отмена",null).show();
+    }
+    private void openFolder(FolderStore.Folder folder){
+        List<ResolveInfo> members=folderApps(folder);
+        GridView icons=icons(members,3,false,false);
+        icons.setVerticalSpacing(dp(6));
+        icons.setPadding(dp(8),dp(8),dp(8),dp(8));
+        new AlertDialog.Builder(this).setTitle("▣  "+folder.name)
+            .setView(icons)
+            .setNegativeButton("Закрыть",null)
+            .setPositiveButton("Изменить",(d,w)->editFolder(folder))
+            .show();
+        ViewGroup.LayoutParams lp=icons.getLayoutParams();
+        if(lp!=null){lp.height=dp(220);icons.setLayoutParams(lp);}
+    }
+    private void editFolder(FolderStore.Folder folder){
+        String[] choices={"Переименовать","Добавить приложение","Убрать приложение","Удалить папку"};
+        new AlertDialog.Builder(this).setTitle(folder.name)
+            .setItems(choices,(dialog,option)->{
+                if(option==0){
+                    EditText name=new EditText(this);
+                    name.setSingleLine(true);name.setText(folder.name);
+                    new AlertDialog.Builder(this).setTitle("Название папки").setView(name)
+                        .setNegativeButton("Отмена",null)
+                        .setPositiveButton("Сохранить",(d,w)->{
+                            FolderStore.rename(this,folder.id,name.getText().toString());
+                            showHome();
+                        }).show();
+                }else if(option==1){
+                    if(applications.isEmpty())return;
+                    String[] labels=new String[applications.size()];
+                    for(int i=0;i<applications.size();i++)
+                        labels[i]=String.valueOf(applications.get(i).loadLabel(getPackageManager()));
+                    new AlertDialog.Builder(this).setTitle("Добавить в "+folder.name)
+                        .setItems(labels,(d,w)->{
+                            ResolveInfo app=applications.get(w);
+                            if(FolderStore.add(this,folder.id,componentKey(app))){
+                                removePinIfPresent(app);showHome();
+                            }else Toast.makeText(this,"Папка заполнена",Toast.LENGTH_SHORT).show();
+                        }).setNegativeButton("Отмена",null).show();
+                }else if(option==2){
+                    List<ResolveInfo> members=folderApps(folder);
+                    if(members.isEmpty())return;
+                    String[] names=new String[members.size()];
+                    for(int i=0;i<members.size();i++)
+                        names[i]=String.valueOf(members.get(i).loadLabel(getPackageManager()));
+                    new AlertDialog.Builder(this).setTitle("Убрать из папки")
+                        .setItems(names,(d,w)->{
+                            FolderStore.removeItem(this,folder.id,componentKey(members.get(w)));
+                            showHome();
+                        }).setNegativeButton("Отмена",null).show();
+                }else{
+                    new AlertDialog.Builder(this).setTitle("Удалить папку?")
+                        .setMessage("Ярлыки внутри папки больше не будут закреплены, приложения останутся установлены.")
+                        .setNegativeButton("Отмена",null)
+                        .setPositiveButton("Удалить",(d,w)->{
+                            FolderStore.delete(this,folder.id);showHome();
+                        }).show();
+                }
+            }).setNegativeButton("Отмена",null).show();
+    }
+    private final class HomeAdapter extends BaseAdapter {
+        private final List<FolderStore.Folder> folders=FolderStore.all(HomeActivity.this);
+        private final List<ResolveInfo> apps;
+        private final AppAdapter appAdapter;
+        HomeAdapter(List<ResolveInfo> apps){
+            this.apps=apps;this.appAdapter=new AppAdapter(apps,true,false);
+        }
+        @Override public int getCount(){return Math.min(8,folders.size()+apps.size());}
+        @Override public Object getItem(int position){
+            return position<folders.size()?folders.get(position):apps.get(position-folders.size());
+        }
+        @Override public long getItemId(int position){return position;}
+        @Override public View getView(int position,View recycled,ViewGroup parent){
+            if(position>=folders.size())
+                return appAdapter.getView(position-folders.size(),recycled,parent);
+            FolderStore.Folder folder=folders.get(position);
+            LinearLayout cell=new LinearLayout(HomeActivity.this);
+            cell.setOrientation(LinearLayout.VERTICAL);cell.setGravity(Gravity.CENTER);
+            cell.setPadding(dp(3),dp(4),dp(3),dp(2));
+            FrameLayout preview=new FrameLayout(HomeActivity.this);
+            GradientDrawable bg=new GradientDrawable(
+                GradientDrawable.Orientation.TL_BR,new int[]{0xa96f8ca7,0xb5565f88});
+            bg.setCornerRadius(dp(12));bg.setStroke(dp(1),0x8cc7e4f6);
+            preview.setBackground(bg);
+            List<ResolveInfo> members=folderApps(folder);
+            for(int i=0;i<Math.min(4,members.size());i++){
+                ImageView icon=new ImageView(HomeActivity.this);
+                try{icon.setImageDrawable(members.get(i).loadIcon(getPackageManager()));}
+                catch(Exception ignored){}
+                FrameLayout.LayoutParams lp=new FrameLayout.LayoutParams(dp(20),dp(20));
+                lp.leftMargin=dp(4+(i%2)*22);lp.topMargin=dp(3+(i/2)*22);
+                preview.addView(icon,lp);
+            }
+            cell.addView(preview,new LinearLayout.LayoutParams(dp(49),dp(49)));
+            TextView caption=label(folder.name,10,false);
+            caption.setGravity(Gravity.CENTER);caption.setSingleLine(true);
+            caption.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            cell.addView(caption,new LinearLayout.LayoutParams(-1,dp(22)));
+            cell.setOnClickListener(v->openFolder(folder));
+            cell.setOnLongClickListener(v->{editFolder(folder);return true;});
+            return cell;
+        }
     }
     private void showHome(){
         if(island!=null)island.pause();
@@ -306,7 +466,7 @@ public final class HomeActivity extends Activity {
         grid.setSelector(android.R.color.transparent);
         grid.setVerticalSpacing(dp(4));
         grid.setHorizontalSpacing(dp(3));
-        grid.setAdapter(new AppAdapter(items,pinnable,dock));
+        grid.setAdapter(pinnable?new HomeAdapter(items):new AppAdapter(items,pinnable,dock));
         return grid;
     }
     private void updateClock(){
@@ -404,18 +564,23 @@ public final class HomeActivity extends Activity {
             cell.setOnLongClickListener(v->{
                 String[] options;
                 if(dock)options=new String[]{"Сдвинуть влево","Сдвинуть вправо","Убрать из дока"};
-                else if(onHome)options=new String[]{"Сдвинуть влево","Сдвинуть вправо","Убрать с главного"};
-                else options=new String[]{"Закрепить на главном","Добавить в док"};
+                else if(onHome)options=new String[]{"Сдвинуть влево","Сдвинуть вправо","Убрать с главного","Создать папку","Добавить в папку"};
+                else options=new String[]{"Закрепить на главном","Добавить в док","Создать папку","Добавить в папку"};
                 new AlertDialog.Builder(HomeActivity.this)
                     .setTitle(entry.loadLabel(getPackageManager()))
                     .setItems(options,(dialog,which)->{
                         if(dock||onHome){
                             if(which==0)shiftItem(entry,dock,-1);
                             else if(which==1)shiftItem(entry,dock,1);
-                            else if(dock)changeDock(entry,false);
-                            else changeFavorite(entry,false);
+                            else if(which==2){
+                                if(dock)changeDock(entry,false);
+                                else changeFavorite(entry,false);
+                            }else if(which==3)createFolder(entry);
+                            else if(which==4)chooseFolder(entry);
                         }else if(which==0)changeFavorite(entry,true);
-                        else changeDock(entry,true);
+                        else if(which==1)changeDock(entry,true);
+                        else if(which==2)createFolder(entry);
+                        else if(which==3)chooseFolder(entry);
                     })
                     .setNegativeButton("Отмена",null)
                     .show();
