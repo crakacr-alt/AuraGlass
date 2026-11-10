@@ -23,6 +23,9 @@ public final class AtmosphereRenderer {
     private boolean aurora=true,stars=true,lightning=true,reduceMotion=false;
     private boolean galaxy=true,comets=true,iceEnabled=true,snowEnabled=true,glassTouch=true;
     private float wind=0.17f;
+    private float targetParallaxX,targetParallaxY,parallaxX,parallaxY;
+    private float parallaxAmount=.35f,renderQuality=1f,climateBoost=1f;
+    private boolean parallaxEnabled=false;
     private int weatherCode=0;
     private String previousWeather=null;
     private long weatherChangeAt=0;
@@ -49,9 +52,14 @@ public final class AtmosphereRenderer {
         iceEnabled=Config.bool(ctx,"ice_enabled",true);
         snowEnabled=Config.bool(ctx,"snow_enabled",true);
         glassTouch=Config.bool(ctx,"glass_touch",true);
-        wind=Math.max(-1f,Math.min(1f,WeatherRepository.read(ctx).wind/28f));
+        parallaxEnabled=Config.bool(ctx,"parallax",false)&&!reduceMotion;
+        parallaxAmount=Config.number(ctx,"parallax_strength",.35f);
+        WeatherRepository.Snapshot climate=WeatherRepository.read(ctx);
+        wind=Math.max(-1f,Math.min(1f,climate.wind/28f));
+        boolean manual=!"auto".equals(mode);
+        climateBoost=ClimateGlass.frostBoost(climate,manual);
         iceGlass.configure(Config.number(ctx,"frost_strength",.92f),
-            Config.number(ctx,"frost_recovery",1f),
+            Config.number(ctx,"frost_recovery",1f)*ClimateGlass.recoveryMultiplier(climate,manual),
             Config.number(ctx,"touch_radius",.057f),
             Config.bool(ctx,"touch_melt",true),reduceMotion);
         reduceMotion=Config.bool(ctx,"reduce_motion",false);
@@ -65,6 +73,11 @@ public final class AtmosphereRenderer {
     private float effectPower(String current,String previous,String key,float mix){
         return (current.equals(key)?mix:0f)+(previous.equals(key)?1f-mix:0f);
     }
+    public void setParallax(float x,float y){
+        targetParallaxX=Math.max(-1,Math.min(1,x));
+        targetParallaxY=Math.max(-1,Math.min(1,y));
+    }
+    public void setRenderQuality(float q){renderQuality=Math.max(.2f,Math.min(1f,q));}
     public void startTouch(float x,float y,int width,int height,long when){
         iceGlass.startStroke(x,y,width,height,when);
     }
@@ -108,6 +121,10 @@ public final class AtmosphereRenderer {
         if(previousFrameAt==0)previousFrameAt=ms;
         float dt=Math.max(0,Math.min(150,ms-previousFrameAt));
         previousFrameAt=ms;
+        float smoothing=1-(float)Math.exp(-dt/320f);
+        float parallaxScale=parallaxEnabled?Math.max(0,Math.min(1,parallaxAmount)):0;
+        parallaxX+=(targetParallaxX*parallaxScale-parallaxX)*smoothing;
+        parallaxY+=(targetParallaxY*parallaxScale-parallaxY)*smoothing;
         float hourDifference=((targetHour-animatedHour+36f)%24f)-12f;
         animatedHour=(animatedHour+hourDifference*(1f-(float)Math.exp(-dt/1800f))+24f)%24f;
         float hr=animatedHour;
@@ -157,7 +174,10 @@ public final class AtmosphereRenderer {
         }
         if(daylight<.9f){
             float night=1-daylight;
-            celestial.draw(c,w,h,motion,night,stars,galaxy,comets,reduceMotion);
+            c.save();
+            c.translate(parallaxX*w*.045f,parallaxY*h*.023f);
+            celestial.draw(c,w,h,motion,night,stars,galaxy,comets,reduceMotion,renderQuality);
+            c.restore();
             float moonX=w*.72f,moonY=h*.18f;
             glow(c,moonX,moonY,w*.28f,alpha(0xffc7d8ff,(int)(49*night)));
             disk(c,moonX,moonY,Math.max(6,w*.045f),alpha(0xffe7e9ff,(int)(175*night)));
@@ -165,7 +185,10 @@ public final class AtmosphereRenderer {
             c.drawCircle(moonX+w*.013f,moonY-w*.012f,Math.max(5,w*.042f),p);
             if(aurora&&(ice||"clear".equals(weather)||"clear".equals(before))&&(hr>=20||hr<=6)){
                 float clearBlend=("clear".equals(weather)?mix:0f)+("clear".equals(before)?1f-mix:0f);
+                c.save();
+                c.translate(-parallaxX*w*.024f,-parallaxY*h*.014f);
                 drawAurora(c,w,h,motion,night*Math.max(clearBlend,icePower));
+                c.restore();
             }
             // Smooth, separately phased time-lapse comets are handled by CelestialLayer.
         }
@@ -177,11 +200,11 @@ public final class AtmosphereRenderer {
         }
         drawRidge(c,w,h,motion,daylight,twilight);
         if(rain)drawRain(c,w,h,motion,intensity*rainPower,lightning&&"storm".equals(weather));
-        if(snow)drawSnow(c,w,h,motion,intensity*snowPower);
+        if(snow)drawSnow(c,w,h,motion,intensity*snowPower*renderQuality);
         if(fog)glow(c,w*.5f,h*.77f,w*.9f,alpha(0xffe4e7fa,(int)(75*fogPower)));
         // Foreground cold glass: the fingertip warms the film, then moisture returns.
         float glassFilm=glassTouch?.21f:0f;
-        float frozenSurface=Math.max(glassFilm,icePower);
+        float frozenSurface=Math.max(glassFilm,icePower*climateBoost);
         iceGlass.draw(c,width,height,ms,frozenSurface);
     }
     private void disk(Canvas c,float x,float y,float r,int color){p.setShader(null);p.setColor(color);c.drawCircle(x,y,r,p);}
@@ -191,10 +214,12 @@ public final class AtmosphereRenderer {
     }
     private void drawAurora(Canvas c,float w,float h,float t,float night){
         // Layered curtains: slowly moving harmonics, feathered vertical falloff.
-        for(int curtain=0;curtain<4;curtain++){
+        int curtains=renderQuality<.6f?2:4;
+        for(int curtain=0;curtain<curtains;curtain++){
             int col=curtain%3==0?0xff6ef9d9:curtain%3==1?0xff92b8ff:0xffc78eff;
             float base=h*(.06f+curtain*.032f);
-            for(int layer=0;layer<5;layer++){
+            int layers=renderQuality<.6f?3:5;
+            for(int layer=0;layer<layers;layer++){
                 float strip=h*(.044f+layer*.024f);
                 Path shape=new Path();
                 for(int n=0;n<=32;n++){

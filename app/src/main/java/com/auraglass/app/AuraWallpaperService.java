@@ -16,6 +16,8 @@ public final class AuraWallpaperService extends WallpaperService {
     private final class AuraEngine extends Engine implements SharedPreferences.OnSharedPreferenceChangeListener {
         private final Handler handler=new Handler(Looper.getMainLooper());
         private final AtmosphereRenderer renderer=new AtmosphereRenderer();
+        private final ParallaxMotion motion=new ParallaxMotion(AuraWallpaperService.this,renderer);
+        private final RenderBudget budget=new RenderBudget(AuraWallpaperService.this);
         private boolean visible=false,active=true,queued=false;
         private int w=1,h=1;
         private final Runnable frame=new Runnable(){
@@ -26,7 +28,11 @@ public final class AuraWallpaperService extends WallpaperService {
             setTouchEventsEnabled(true);
             Config.prefs(AuraWallpaperService.this).registerOnSharedPreferenceChangeListener(this);
         }
-        @Override public void onVisibilityChanged(boolean v){visible=v;if(v)schedule(0);else stop();}
+        @Override public void onVisibilityChanged(boolean v){
+            visible=v;
+            if(v){motion.start();schedule(0);}
+            else{motion.stop();stop();}
+        }
         @Override public void onSurfaceChanged(SurfaceHolder holder,int format,int width,int height){
             super.onSurfaceChanged(holder,format,width,height);
             w=width;h=height;schedule(0);
@@ -50,7 +56,7 @@ public final class AuraWallpaperService extends WallpaperService {
             }
         }
         @Override public void onSurfaceDestroyed(SurfaceHolder holder){
-            visible=false;stop();super.onSurfaceDestroyed(holder);
+            visible=false;motion.stop();stop();super.onSurfaceDestroyed(holder);
         }
         private void stop(){handler.removeCallbacks(frame);queued=false;}
         private void schedule(long delay){
@@ -64,27 +70,24 @@ public final class AuraWallpaperService extends WallpaperService {
             long start=SystemClock.uptimeMillis();
             try{
                 canvas=holder.lockCanvas();
-                if(canvas!=null)renderer.draw(canvas,w,h,start);
+                if(canvas!=null){
+                    renderer.setRenderQuality(budget.quality());
+                    renderer.draw(canvas,w,h,start);
+                }
             }catch(Exception ignored){
                 // A changing surface can be temporarily unavailable during wallpaper transitions.
             }finally{
                 if(canvas!=null)try{holder.unlockCanvasAndPost(canvas);}catch(Exception ignored){}
             }
-            boolean saver=false;
-            PowerManager pm=(PowerManager)getSystemService(POWER_SERVICE);
-            if(pm!=null)saver=pm.isPowerSaveMode();
-            boolean high=Config.bool(AuraWallpaperService.this,"high_fps",false);
-            int ms=saver?67:(high?17:34);
             long spent=SystemClock.uptimeMillis()-start;
-            if(spent>ms)ms=Math.min(100,(int)(spent*1.75f));
-            schedule(Math.max(12,ms-spent));
+            schedule(budget.nextDelay(start,spent));
         }
         @Override public void onSharedPreferenceChanged(SharedPreferences prefs,String key){
             renderer.reload(AuraWallpaperService.this);
-            if(visible){stop();schedule(0);}
+            if(visible){motion.stop();motion.start();stop();schedule(0);}
         }
         @Override public void onDestroy(){
-            active=false;stop();
+            active=false;motion.stop();stop();
             Config.prefs(AuraWallpaperService.this).unregisterOnSharedPreferenceChangeListener(this);
             super.onDestroy();
         }

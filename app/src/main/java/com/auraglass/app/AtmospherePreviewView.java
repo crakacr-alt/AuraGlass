@@ -15,8 +15,19 @@ public final class AtmospherePreviewView extends View {
     private final WeatherCardPainter weather=new WeatherCardPainter();
     private final Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);
     private boolean running;
-    public AtmospherePreviewView(Context c){super(c);renderer.reload(c);}
-    public void reload(){renderer.reload(getContext());invalidate();}
+    private final RenderBudget budget;
+    private final ParallaxMotion motion;
+    public AtmospherePreviewView(Context c){
+        super(c);
+        budget=new RenderBudget(c);
+        motion=new ParallaxMotion(c,renderer);
+        renderer.reload(c);
+    }
+    public void reload(){
+        renderer.reload(getContext());
+        motion.stop();if(running)motion.start();
+        invalidate();
+    }
     @Override protected void onDraw(Canvas c){
         super.onDraw(c);
         float w=getWidth(),h=getHeight();
@@ -24,7 +35,9 @@ public final class AtmospherePreviewView extends View {
         float rad=28*getResources().getDisplayMetrics().density;
         c.save();
         Path clip=new Path();clip.addRoundRect(new RectF(0,0,w,h),rad,rad,Path.Direction.CW);c.clipPath(clip);
-        renderer.draw(c,(int)w,(int)h,SystemClock.uptimeMillis());
+        long start=SystemClock.uptimeMillis();
+        renderer.setRenderQuality(budget.quality());
+        renderer.draw(c,(int)w,(int)h,start);
         p.setColor(0x20ffffff);p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(2);
         c.drawRoundRect(new RectF(1,1,w-1,h-1),rad,rad,p);p.setStyle(Paint.Style.FILL);
         p.setColor(Color.WHITE);
@@ -45,17 +58,15 @@ public final class AtmospherePreviewView extends View {
             WeatherRepository.read(getContext()),SystemClock.uptimeMillis()/1000f);
         c.restore();
         c.restore();
-        if(running){
-            android.os.PowerManager pm=(android.os.PowerManager)getContext().getSystemService(Context.POWER_SERVICE);
-            boolean saver=pm!=null&&pm.isPowerSaveMode();
-            postInvalidateDelayed(saver?120:(Config.bool(getContext(),"high_fps",false)?33:55));
-        }
+        if(running)postInvalidateDelayed(budget.nextDelay(start,SystemClock.uptimeMillis()-start));
     }
     @Override public boolean onTouchEvent(MotionEvent event){
         if(event==null)return false;
         int type=event.getActionMasked();
         if(type==MotionEvent.ACTION_DOWN){
             getParent().requestDisallowInterceptTouchEvent(true);
+            if(Config.bool(getContext(),"haptics",true))
+                performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK);
             renderer.startTouch(event.getX(),event.getY(),getWidth(),getHeight(),event.getEventTime());
             invalidate();
             return true;
@@ -75,11 +86,16 @@ public final class AtmospherePreviewView extends View {
         }
         return true;
     }
-    @Override protected void onAttachedToWindow(){super.onAttachedToWindow();running=true;invalidate();}
-    @Override protected void onDetachedFromWindow(){running=false;super.onDetachedFromWindow();}
+    @Override protected void onAttachedToWindow(){
+        super.onAttachedToWindow();running=true;motion.start();invalidate();
+    }
+    @Override protected void onDetachedFromWindow(){
+        running=false;motion.stop();super.onDetachedFromWindow();
+    }
     @Override protected void onWindowVisibilityChanged(int visibility){
         super.onWindowVisibilityChanged(visibility);
         running=visibility==VISIBLE;
-        if(running)invalidate();
+        if(running){motion.start();invalidate();}
+        else motion.stop();
     }
 }

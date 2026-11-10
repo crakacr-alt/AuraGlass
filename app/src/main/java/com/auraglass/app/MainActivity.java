@@ -146,11 +146,19 @@ public final class MainActivity extends Activity {
         setting(iceControls,"Галактика и звёздная пыль","galaxy",true);
         setting(iceControls,"Кометы и светящиеся хвосты","comets",true);
         setting(iceControls,"Тепло пальца · рисовать по льду","touch_melt",true);
+        setting(iceControls,"Сугробы по краям виджетов","snow_accumulation",true);
+        setting(iceControls,"Мягкий тактильный отклик","haptics",true);
+        setting(iceControls,"Параллакс звёзд и сияния","parallax",false);
+        scaledSlider(iceControls,"Глубина параллакса","parallax_strength",.35f,0f,.85f);
         setting(iceControls,"Запотевание обычного стекла","glass_touch",true);
         slider(iceControls,"Интенсивность инея","frost_strength",.92f);
         scaledSlider(iceControls,"Восстановление морозного рисунка","frost_recovery",1f,.4f,2.6f);
         scaledSlider(iceControls,"Радиус следа пальца","touch_radius",.057f,.025f,.12f);
 
+        section(content,"Производительность","Качество будет снижаться автоматически при нагреве или энергосбережении.");
+        LinearLayout perf=surface();
+        add(content,perf,-2);
+        modeRowQuality(perf);
         section(content,"Тонкая настройка",null);
         LinearLayout sliders=surface();add(content,sliders,-2);
         slider(sliders,"Интенсивность эффектов","intensity",.58f);
@@ -225,6 +233,23 @@ public final class MainActivity extends Activity {
             @Override public void onStartTrackingTouch(SeekBar s){}
             @Override public void onStopTrackingTouch(SeekBar s){}
         });
+    }
+    private void modeRowQuality(LinearLayout parent){
+        LinearLayout row=vertical();
+        String[] values={"auto","quality","battery"};
+        String[] labels={"Авто","Качество","Экономия"};
+        LinearLayout buttons=new LinearLayout(this);
+        for(int i=0;i<values.length;i++){
+            String value=values[i];
+            Button b=action(labels[i],()->{
+                Config.put(this,"render_quality",value);
+                preview.reload();
+            });
+            LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(44),1);
+            if(i>0)lp.leftMargin=dp(5);
+            buttons.addView(b,lp);
+        }
+        parent.addView(buttons,params(-1,44));
     }
     private void scaledSlider(LinearLayout box,String label,String key,float def,float low,float high){
         TextView heading=text(label,13,true);

@@ -12,6 +12,7 @@ import android.graphics.Shader;
 import android.graphics.drawable.Drawable;
 import android.os.SystemClock;
 import android.view.MotionEvent;
+import android.view.HapticFeedbackConstants;
 import android.widget.FrameLayout;
 
 /** Glass card with tactile thermal/optical response, without stealing child clicks. */
@@ -20,6 +21,7 @@ public final class GlassPanel extends FrameLayout {
     private final Path clip=new Path();
     private final RectF bounds=new RectF();
     private IceGlassLayer ice;
+    private final SnowEdgeLayer snowEdge=new SnowEdgeLayer();
     private float pressedX,pressedY;
     private long pressStartedAt,pressEndedAt,lastWarmAt;
     private boolean holding;
@@ -42,6 +44,9 @@ public final class GlassPanel extends FrameLayout {
         float strength=frostStrength();
         boolean enabled=Config.bool(getContext(),"touch_melt",true);
         if(action==MotionEvent.ACTION_DOWN){
+            if(Config.bool(getContext(),"haptics",true))
+                performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK);
+            snowEdge.touch(event.getX(),now);
             pressedX=event.getX();pressedY=event.getY();
             pressStartedAt=now;pressEndedAt=0;holding=true;
             if(enabled&&strength>.01f){
@@ -94,6 +99,21 @@ public final class GlassPanel extends FrameLayout {
             canvas.restore();
         }
         super.dispatchDraw(canvas);
+        if(w>0&&h>0&&Config.bool(getContext(),"snow_accumulation",true)){
+            String current=Config.str(getContext(),"weather_mode","auto");
+            WeatherRepository.Snapshot weather=WeatherRepository.read(getContext());
+            boolean snowfall="snow".equals(current)||"ice".equals(current)||
+                "auto".equals(current)&&weather.available&&
+                (weather.code>=71&&weather.code<=77||weather.code>=85&&weather.code<=86);
+            if(snowfall){
+                canvas.save();
+                canvas.clipPath(clip);
+                snowEdge.draw(canvas,w,h,now,"ice".equals(current)?.75f:.56f);
+                canvas.restore();
+                if(getWindowVisibility()==VISIBLE&&!Config.bool(getContext(),"reduce_motion",false))
+                    postInvalidateDelayed(220);
+            }
+        }
         if(w>0&&h>0&&(holding||pressEndedAt>0&&now-pressEndedAt<720)){
             float age=holding?0:(now-pressEndedAt)/720f;
             float fade=(1-Math.max(0,Math.min(1,age)));

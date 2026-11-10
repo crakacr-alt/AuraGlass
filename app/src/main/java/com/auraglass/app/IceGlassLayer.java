@@ -261,6 +261,13 @@ public final class IceGlassLayer {
             rebuild(now,sceneStrength);
         destination.set(0,0,width,height);
         bitmapPaint.setAlpha(255);
+        // Thin offset highlight imitates refracted light at micro-crystal edges,
+        // without claiming real screen-space refraction on a software Canvas.
+        bitmapPaint.setAlpha(Math.min(50,(int)(25*sceneStrength)));
+        destination.offset(Math.max(1f,width*.0008f),Math.max(1f,height*.0005f));
+        canvas.drawBitmap(mask,source,destination,bitmapPaint);
+        destination.offset(-Math.max(1f,width*.0008f),-Math.max(1f,height*.0005f));
+        bitmapPaint.setAlpha(255);
         canvas.drawBitmap(mask,source,destination,bitmapPaint);
         // Glints on nucleation tips stay small and do not flash or allocate on every frame.
         if(!reducedMotion&&sceneStrength>.2f){

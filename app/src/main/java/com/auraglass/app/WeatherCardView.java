@@ -7,6 +7,7 @@ import android.graphics.RectF;
 import android.graphics.RadialGradient;
 import android.graphics.Shader;
 import android.view.MotionEvent;
+import android.view.HapticFeedbackConstants;
 import android.os.SystemClock;
 import android.view.View;
 public final class WeatherCardView extends View {
@@ -17,6 +18,7 @@ public final class WeatherCardView extends View {
     private long lastPress;
     private final Paint ripplePaint=new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Path clip=new Path();
+    private final SnowEdgeLayer snowEdge=new SnowEdgeLayer();
     public WeatherCardView(Context c){
         super(c);
         setOnClickListener(v->{if(!SamsungWeather.open(getContext()))getContext().startActivity(
@@ -26,7 +28,21 @@ public final class WeatherCardView extends View {
         super.onDraw(c);
         painter.draw(c,getContext(),getWidth(),getHeight(),WeatherRepository.read(getContext()),
             (SystemClock.uptimeMillis()-started)/1000f);
-        long age=SystemClock.uptimeMillis()-lastPress;
+        long now=SystemClock.uptimeMillis();
+        String mode=Config.str(getContext(),"weather_mode","auto");
+        WeatherRepository.Snapshot weather=WeatherRepository.read(getContext());
+        boolean snow="snow".equals(mode)||"ice".equals(mode)||
+            "auto".equals(mode)&&weather.available&&
+            (weather.code>=71&&weather.code<=77||weather.code>=85&&weather.code<=86);
+        if(snow&&Config.bool(getContext(),"snow_accumulation",true)){
+            float d=getResources().getDisplayMetrics().density;
+            clip.reset();
+            clip.addRoundRect(new RectF(0,0,getWidth(),getHeight()),28*d,28*d,Path.Direction.CW);
+            c.save();c.clipPath(clip);
+            snowEdge.draw(c,getWidth(),getHeight(),now,.65f);
+            c.restore();
+        }
+        long age=now-lastPress;
         if(lastPress>0&&(held||age<660)){
             float fade=held?1f:Math.max(0,1-age/660f);
             float radius=(52f+(held?0:age*.10f))*getResources().getDisplayMetrics().density;
@@ -48,6 +64,9 @@ public final class WeatherCardView extends View {
     @Override public boolean onTouchEvent(MotionEvent event){
         int action=event.getActionMasked();
         if(action==MotionEvent.ACTION_DOWN){
+            if(Config.bool(getContext(),"haptics",true))
+                performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK);
+            snowEdge.touch(event.getX(),SystemClock.uptimeMillis());
             fingerX=event.getX();fingerY=event.getY();held=true;lastPress=SystemClock.uptimeMillis();
             invalidate();
         }else if(action==MotionEvent.ACTION_MOVE){

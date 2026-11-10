@@ -51,7 +51,7 @@ public final class CelestialLayer {
     }
 
     public void draw(Canvas c,float width,float height,float seconds,float night,
-                     boolean stars,boolean galaxy,boolean comets,boolean reduced){
+                     boolean stars,boolean galaxy,boolean comets,boolean reduced,float quality){
         if(night<.005f)return;
         float w=width,h=height;
         float clock=reduced?0:seconds;
@@ -64,14 +64,14 @@ public final class CelestialLayer {
                     k%2==0?0xffa1a8ed:0xffdfafdd,night*.039f);
             }
             glow(c,w*.48f,h*.30f,w*.40f,0xff6677d9,night*.046f);
-            for(int i=0;i<dustX.length;i++){
+            for(int i=0;i<(int)(dustX.length*Math.max(.30f,quality));i++){
                 float pulse=reduced?1:.83f+.17f*(float)Math.sin(clock*.11f+twinkle[i%sx.length]);
                 paint.setColor(tint(i%5==0?0xfff9deef:0xffc9d5fa,night*pulse*(.23f+(i%3)*.09f)));
                 c.drawCircle(dustX[i]*w,dustY[i]*h,w*.00054f*dustSize[i]+.35f,paint);
             }
         }
         if(stars){
-            for(int i=0;i<sx.length;i++){
+            for(int i=0;i<(int)(sx.length*Math.max(.35f,quality));i++){
                 float flicker=reduced?.82f:.72f+.28f*(float)Math.sin(clock*(.46f+(i%9)*.09f)+twinkle[i]);
                 float visibility=night*(.27f+.73f*flicker);
                 float x=sx[i]*w,y=sy[i]*h;

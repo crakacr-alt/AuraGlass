@@ -43,12 +43,16 @@ public final class IceShowcaseActivity extends Activity {
     private final class IceScene extends View {
         private final Paint type=new Paint(Paint.ANTI_ALIAS_FLAG);
         private final AtmosphereRenderer renderer=new AtmosphereRenderer();
+        private final ParallaxMotion motion=new ParallaxMotion(IceShowcaseActivity.this,renderer);
+        private final RenderBudget budget=new RenderBudget(IceShowcaseActivity.this);
         private boolean active;
         private final float density=getResources().getDisplayMetrics().density;
         IceScene(){super(IceShowcaseActivity.this);renderer.reload(IceShowcaseActivity.this);}
         @Override protected void onDraw(Canvas c){
             super.onDraw(c);
-            renderer.draw(c,getWidth(),getHeight(),SystemClock.uptimeMillis());
+            long start=SystemClock.uptimeMillis();
+            renderer.setRenderQuality(budget.quality());
+            renderer.draw(c,getWidth(),getHeight(),start);
             type.setTypeface(Typeface.create("sans-serif-light",Typeface.NORMAL));
             type.setTextSize(25*density);type.setColor(0xd8e9faff);
             type.setShadowLayer(7*density,0,2*density,0x990d1640);
@@ -59,15 +63,13 @@ public final class IceShowcaseActivity extends Activity {
             c.drawText("Иней вернётся постепенно",dp(23),getHeight()-dp(96),type);
             c.drawText("Назад  ·  выйти из предпросмотра",dp(23),getHeight()-dp(45),type);
             type.clearShadowLayer();
-            if(active){
-                PowerManager pm=(PowerManager)getSystemService(POWER_SERVICE);
-                boolean saver=pm!=null&&pm.isPowerSaveMode();
-                postInvalidateDelayed(saver?70:(Config.bool(IceShowcaseActivity.this,"high_fps",false)?17:34));
-            }
+            if(active)postInvalidateDelayed(budget.nextDelay(start,SystemClock.uptimeMillis()-start));
         }
         @Override public boolean onTouchEvent(MotionEvent event){
             int action=event.getActionMasked();
             if(action==MotionEvent.ACTION_DOWN){
+                if(Config.bool(IceShowcaseActivity.this,"haptics",true))
+                    performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK);
                 renderer.startTouch(event.getX(),event.getY(),getWidth(),getHeight(),event.getEventTime());
                 invalidate();return true;
             }
@@ -84,15 +86,22 @@ public final class IceShowcaseActivity extends Activity {
             }
             return true;
         }
-        @Override protected void onAttachedToWindow(){super.onAttachedToWindow();active=true;invalidate();}
-        @Override protected void onDetachedFromWindow(){active=false;super.onDetachedFromWindow();}
+        @Override protected void onAttachedToWindow(){
+            super.onAttachedToWindow();active=true;motion.start();invalidate();
+        }
+        @Override protected void onDetachedFromWindow(){
+            active=false;motion.stop();super.onDetachedFromWindow();
+        }
         @Override protected void onWindowVisibilityChanged(int visibility){
             super.onWindowVisibilityChanged(visibility);
             active=visibility==VISIBLE;
-            if(active){renderer.reload(IceShowcaseActivity.this);invalidate();}
+            if(active){renderer.reload(IceShowcaseActivity.this);motion.start();invalidate();}
+            else motion.stop();
         }
-        void resume(){renderer.reload(IceShowcaseActivity.this);active=true;invalidate();}
-        void pause(){active=false;}
+        void resume(){
+            renderer.reload(IceShowcaseActivity.this);active=true;motion.start();invalidate();
+        }
+        void pause(){active=false;motion.stop();}
     }
     @Override protected void onResume(){super.onResume();if(scene!=null)scene.resume();}
     @Override protected void onPause(){if(scene!=null)scene.pause();super.onPause();}
