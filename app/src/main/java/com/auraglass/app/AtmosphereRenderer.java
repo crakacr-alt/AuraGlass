@@ -17,6 +17,7 @@ public final class AtmosphereRenderer {
     private final Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);
     private final IceGlassLayer iceGlass=new IceGlassLayer();
     private final CelestialLayer celestial=new CelestialLayer();
+    private final MoonPhase moonPhase=new MoonPhase();
     private final float[] rx=new float[125],ry=new float[125],rv=new float[125],rs=new float[125];
     private String mode="auto", period="auto";
     private float intensity=.58f,speed=.65f;
@@ -180,9 +181,7 @@ public final class AtmosphereRenderer {
             c.restore();
             float moonX=w*.72f,moonY=h*.18f;
             glow(c,moonX,moonY,w*.28f,alpha(0xffc7d8ff,(int)(49*night)));
-            disk(c,moonX,moonY,Math.max(6,w*.045f),alpha(0xffe7e9ff,(int)(175*night)));
-            p.setColor(alpha(top,(int)(210*night)));
-            c.drawCircle(moonX+w*.013f,moonY-w*.012f,Math.max(5,w*.042f),p);
+            moonPhase.draw(c,moonX,moonY,Math.max(6,w*.045f),night,System.currentTimeMillis());
             if(aurora&&(ice||"clear".equals(weather)||"clear".equals(before))&&(hr>=20||hr<=6)){
                 float clearBlend=("clear".equals(weather)?mix:0f)+("clear".equals(before)?1f-mix:0f);
                 c.save();
