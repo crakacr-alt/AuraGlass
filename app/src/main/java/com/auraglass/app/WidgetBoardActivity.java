@@ -40,6 +40,7 @@ public final class WidgetBoardActivity extends Activity {
     private LinearLayout content;
     private int pendingId=AppWidgetManager.INVALID_APPWIDGET_ID;
     private boolean active;
+    private int selectedHomePage=0;
 
     private int dp(float v){return (int)(v*getResources().getDisplayMetrics().density+.5f);}
     private TextView text(String value,int size,boolean bold){
@@ -79,6 +80,8 @@ public final class WidgetBoardActivity extends Activity {
         RefreshRateSupport.applyToActivity(this);
         manager=AppWidgetManager.getInstance(this);
         host=new AppWidgetHost(this,HOST_ID);
+        selectedHomePage=Math.max(0,Math.min(WorkspacePager.pageCount(this)-1,
+            getIntent().getIntExtra("home_page",0)));
         getWindow().setStatusBarColor(0xff1c2239);
         getWindow().setNavigationBarColor(0xff121829);
         FrameLayout surface=new FrameLayout(this);
@@ -146,6 +149,9 @@ public final class WidgetBoardActivity extends Activity {
             .setPositiveButton("Удалить",(d,w)->{
                 ids.remove(Integer.valueOf(id));
                 saveIds();
+                Config.prefs(this).edit()
+                    .remove("widget_page_"+id)
+                    .remove("widget_height_"+id).apply();
                 try{host.deleteAppWidgetId(id);}catch(RuntimeException ignored){}
                 build();
             }).show();
@@ -155,7 +161,8 @@ public final class WidgetBoardActivity extends Activity {
         content.removeAllViews();
         TextView title=text("AURA · ВИДЖЕТЫ",26,true);
         content.addView(title);
-        TextView info=text("Настоящие виджеты Android. Нажимай на них, как на рабочем столе.",12,false);
+        TextView info=text("Настоящие виджеты Android. Новые виджеты появятся на странице "+
+            (selectedHomePage+1)+" рабочего стола.",12,false);
         info.setTextColor(0xffd5daea);
         LinearLayout.LayoutParams sub=new LinearLayout.LayoutParams(-1,-2);
         sub.topMargin=dp(5);sub.bottomMargin=dp(10);
@@ -186,7 +193,8 @@ public final class WidgetBoardActivity extends Activity {
             card.setBackground(glass(0xce475376,0xd13b425f,20));
             card.setElevation(dp(2));
             LinearLayout labelRow=new LinearLayout(this);
-            TextView widgetName=text(provider.loadLabel(getPackageManager()),13,true);
+            TextView widgetName=text(provider.loadLabel(getPackageManager())+
+                " · стр. "+((int)Config.number(this,"widget_page_"+widgetId,0)+1),13,true);
             labelRow.addView(widgetName,new LinearLayout.LayoutParams(0,dp(34),1));
             final int position=i;
             Button up=action("↑",()->move(ids.indexOf(widgetId),-1));
@@ -210,6 +218,8 @@ public final class WidgetBoardActivity extends Activity {
                 new LinearLayout.LayoutParams(0,dp(42),1));
             controls.addView(action("+ Высота",()->setWidgetHeight(widgetId,
                 widgetHeight(widgetId,manager.getAppWidgetInfo(widgetId))+40)),
+                new LinearLayout.LayoutParams(0,dp(42),1));
+            controls.addView(action("Страница",()->chooseWidgetPage(widgetId)),
                 new LinearLayout.LayoutParams(0,dp(42),1));
             controls.addView(action("Удалить",()->remove(widgetId)),
                 new LinearLayout.LayoutParams(0,dp(42),1));
@@ -235,6 +245,20 @@ public final class WidgetBoardActivity extends Activity {
         content.addView(note,noteLp);
     }
 
+    private void chooseWidgetPage(int widgetId){
+        int count=WorkspacePager.pageCount(this);
+        String[] pages=new String[count];
+        for(int page=0;page<count;page++)
+            pages[page]="Страница "+(page+1);
+        new AlertDialog.Builder(this).setTitle("На какую страницу поместить виджет?")
+            .setItems(pages,(dialog,chosen)->{
+                Config.put(this,"widget_page_"+widgetId,(float)chosen);
+                selectedHomePage=chosen;
+                message("Виджет появится на странице "+(chosen+1)+" AURA Home");
+                build();
+            })
+            .setNegativeButton("Отмена",null).show();
+    }
     private void chooseProvider(){
         if(ids.size()>=20){message("Максимум 20 виджетов на странице");return;}
         final List<AppWidgetProviderInfo> providers=manager.getInstalledProviders();
@@ -285,6 +309,7 @@ public final class WidgetBoardActivity extends Activity {
     private void saveWidget(int id){
         if(id<=0)return;
         if(!ids.contains(id))ids.add(id);
+        Config.put(this,"widget_page_"+id,(float)selectedHomePage);
         pendingId=AppWidgetManager.INVALID_APPWIDGET_ID;
         saveIds();build();
     }

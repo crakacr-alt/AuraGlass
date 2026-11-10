@@ -2,6 +2,10 @@ package com.auraglass.app;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.appwidget.AppWidgetHost;
+import android.appwidget.AppWidgetHostView;
+import android.appwidget.AppWidgetManager;
+import android.appwidget.AppWidgetProviderInfo;
 import android.content.ClipData;
 import android.view.DragEvent;
 import android.content.ComponentName;
@@ -47,6 +51,10 @@ public final class HomeActivity extends Activity {
     private AuraIslandView island;
     private int homePage=0;
     private boolean arrangeMode=false;
+    private AppWidgetHost desktopWidgetHost;
+    private AppWidgetManager desktopWidgetManager;
+    private boolean widgetListening=false;
+    private String widgetLayoutSnapshot="";
     private static final class ShortcutDrag {
         final int page,slot;
         ShortcutDrag(int page,int slot){this.page=page;this.slot=slot;}
@@ -74,7 +82,10 @@ public final class HomeActivity extends Activity {
         root=new FrameLayout(this);
         root.setBackgroundColor(Color.TRANSPARENT);
         setContentView(root);
+        desktopWidgetHost=new AppWidgetHost(this,70901);
+        desktopWidgetManager=AppWidgetManager.getInstance(this);
         loadApplications();
+        widgetLayoutSnapshot=widgetLayoutState();
         showHome();
     }
     private void loadApplications(){
@@ -522,6 +533,83 @@ public final class HomeActivity extends Activity {
         layout.topMargin=dp(8);
         vertical.addView(strip,layout);
     }
+    private void openWidgetBoard(){
+        Intent intent=new Intent(this,WidgetBoardActivity.class);
+        intent.putExtra("home_page",homePage);
+        startActivity(intent);
+    }
+    private String widgetLayoutState(){
+        String ids=Config.str(this,"widget_board_ids","");
+        StringBuilder snapshot=new StringBuilder(ids);
+        for(String text:ids.split(",")){
+            try{
+                int id=Integer.parseInt(text);
+                snapshot.append('|').append(id).append(':')
+                    .append(Config.number(this,"widget_page_"+id,0))
+                    .append(':').append(Config.number(this,"widget_height_"+id,0));
+            }catch(NumberFormatException ignored){}
+        }
+        return snapshot.toString();
+    }
+    private void showInlineWidgets(LinearLayout container){
+        if(desktopWidgetHost==null||desktopWidgetManager==null)return;
+        String ids=Config.str(this,"widget_board_ids","");
+        int shown=0,hidden=0;
+        LinearLayout widgetsArea=new LinearLayout(this);
+        widgetsArea.setOrientation(LinearLayout.VERTICAL);
+        for(String item:ids.split(",")){
+            int id;
+            try{id=Integer.parseInt(item);}
+            catch(NumberFormatException ignored){continue;}
+            if(id<=0||(int)Config.number(this,"widget_page_"+id,0)!=homePage)continue;
+            if(shown>=4){hidden++;continue;}
+            AppWidgetProviderInfo info;
+            try{info=desktopWidgetManager.getAppWidgetInfo(id);}
+            catch(RuntimeException error){continue;}
+            if(info==null)continue;
+            try{
+                AppWidgetHostView content=desktopWidgetHost.createView(this,id,info);
+                content.setAppWidget(id,info);
+                GlassPanel card=new GlassPanel(this);
+                card.setPadding(dp(7),dp(7),dp(7),dp(8));
+                LinearLayout body=new LinearLayout(this);
+                body.setOrientation(LinearLayout.VERTICAL);
+                TextView caption=label(String.valueOf(info.loadLabel(getPackageManager())),12,true);
+                caption.setTextColor(0xffecf6ff);
+                caption.setPadding(dp(9),0,dp(5),0);
+                body.addView(caption,new LinearLayout.LayoutParams(-1,dp(27)));
+                int height=(int)Config.number(this,"widget_height_"+id,
+                    Math.max(110,info.minHeight));
+                height=Math.max(110,Math.min(480,height));
+                body.addView(content,new LinearLayout.LayoutParams(-1,dp(height)));
+                card.addView(body,new FrameLayout.LayoutParams(-1,-2));
+                LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(-1,-2);
+                cp.bottomMargin=dp(10);
+                widgetsArea.addView(card,cp);
+                shown++;
+            }catch(RuntimeException error){
+                android.util.Log.w("AuraHome","Unable to render widget "+id,error);
+            }
+        }
+        if(shown==0)return;
+        LinearLayout heading=new LinearLayout(this);
+        heading.setGravity(Gravity.CENTER_VERTICAL);
+        TextView label=label("ВИДЖЕТЫ · СТРАНИЦА "+(homePage+1),12,true);
+        label.setTextColor(0xffd0f4f4);
+        heading.addView(label,new LinearLayout.LayoutParams(0,dp(38),1));
+        TextView edit=label("Изменить  ›",12,false);
+        edit.setGravity(Gravity.END|Gravity.CENTER_VERTICAL);
+        edit.setOnClickListener(v->openWidgetBoard());
+        heading.addView(edit,new LinearLayout.LayoutParams(dp(100),dp(38)));
+        container.addView(heading,new LinearLayout.LayoutParams(-1,dp(38)));
+        container.addView(widgetsArea,new LinearLayout.LayoutParams(-1,-2));
+        if(hidden>0){
+            TextView extra=label("Ещё "+hidden+" виджетов · открыть редактор",11,false);
+            extra.setGravity(Gravity.CENTER);
+            extra.setOnClickListener(v->openWidgetBoard());
+            container.addView(extra,new LinearLayout.LayoutParams(-1,dp(34)));
+        }
+    }
     private void showHome(){
         if(island!=null)island.pause();
         root.removeAllViews();drawer=null;island=null;
@@ -552,7 +640,7 @@ public final class HomeActivity extends Activity {
         TextView widgetButton=label("▦",27,false);
         widgetButton.setGravity(Gravity.CENTER);
         widgetButton.setContentDescription("Открыть страницу виджетов AURA");
-        widgetButton.setOnClickListener(v->startActivity(new Intent(this,WidgetBoardActivity.class)));
+        widgetButton.setOnClickListener(v->openWidgetBoard());
         header.addView(widgetButton,new LinearLayout.LayoutParams(dp(50),dp(50)));
         TextView gear=label("⚙",28,false);
         gear.setGravity(Gravity.CENTER);
@@ -583,6 +671,7 @@ public final class HomeActivity extends Activity {
         favorites.setContentDescription("Ярлыки страницы "+(homePage+1));
         shortPanel.addView(favorites,new FrameLayout.LayoutParams(-1,dp(153)));
         vertical.addView(shortPanel,new LinearLayout.LayoutParams(-1,dp(167)));
+        showInlineWidgets(vertical);
 
         TextView more=label("⌃   Все приложения",13,true);
         more.setGravity(Gravity.CENTER);
@@ -760,6 +849,17 @@ public final class HomeActivity extends Activity {
     @Override protected void onResume(){
         super.onResume();
         RefreshRateSupport.applyToActivity(this);
+        if(!widgetListening&&desktopWidgetHost!=null){
+            try{desktopWidgetHost.startListening();widgetListening=true;}
+            catch(RuntimeException error){
+                android.util.Log.w("AuraHome","Widget host cannot listen",error);
+            }
+        }
+        String layout=widgetLayoutState();
+        if(!layout.equals(widgetLayoutSnapshot)){
+            widgetLayoutSnapshot=layout;
+            showHome();
+        }
         refreshInstalledApps();
         timer.removeCallbacks(clockTick);clockTick.run();
         WeatherRepository.refresh(this,false,(ok,msg)->{
@@ -771,6 +871,11 @@ public final class HomeActivity extends Activity {
     }
     @Override protected void onPause(){
         if(island!=null)island.pause();
+        if(widgetListening&&desktopWidgetHost!=null){
+            try{desktopWidgetHost.stopListening();}
+            catch(RuntimeException ignored){}
+            widgetListening=false;
+        }
         timer.removeCallbacks(clockTick);super.onPause();
     }
     @Override public void onBackPressed(){
