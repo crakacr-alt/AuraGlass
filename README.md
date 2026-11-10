@@ -15,6 +15,13 @@ A native Android prototype for a Samsung/One UI-friendly launcher, living wallpa
 - Original/system wallpaper remains unchanged **unless the user explicitly confirms AURA live wallpaper**; to restore earlier wallpaper, the user uses Android's wallpaper picker
 - AURA Home default launcher is selected through Android's HOME role/settings, and can be reverted to One UI Home there
 
+## Download APK
+
+- **[Direct Android APK from GitHub Releases](https://github.com/crakacr-alt/AuraGlass/releases/download/v0.1-alpha/AuraGlass-v0.1-alpha.apk)**
+- **[Release page](https://github.com/crakacr-alt/AuraGlass/releases/tag/v0.1-alpha)**
+- The APK is published only after the Android CI build succeeds. It is an unsigned-for-production, debug-signed alpha and not yet validated on a Galaxy S24 Ultra.
+- If a newly built alpha cannot be installed over an older build, uninstall the earlier test build first; debug keys may change between GitHub runners.
+
 ## Build
 
 - Android Studio: open repository, sync Gradle, run `app`

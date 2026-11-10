@@ -1,14 +1,16 @@
-name: Build AuraGlass APK
+name: Build & Publish AuraGlass APK
+
 on:
   push:
     branches: [main]
   workflow_dispatch:
+
 jobs:
   build:
-    name: Android debug APK
+    name: Android alpha APK
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -26,9 +28,27 @@ jobs:
           gradle-version: '8.10.2'
       - name: Build debug APK
         run: gradle --no-daemon :app:assembleDebug
+      - name: Verify APK and prepare download
+        run: |
+          test -s app/build/outputs/apk/debug/app-debug.apk
+          unzip -t app/build/outputs/apk/debug/app-debug.apk | tail -1
+          cp app/build/outputs/apk/debug/app-debug.apk AuraGlass-v0.1-alpha.apk
+          sha256sum AuraGlass-v0.1-alpha.apk
       - uses: actions/upload-artifact@v4
-        if: success()
         with:
           name: AuraGlass-v0.1-alpha-debug
-          path: app/build/outputs/apk/debug/*.apk
+          path: AuraGlass-v0.1-alpha.apk
           if-no-files-found: error
+      - name: Publish APK in GitHub Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view v0.1-alpha >/dev/null 2>&1; then
+            gh release upload v0.1-alpha AuraGlass-v0.1-alpha.apk --clobber
+          else
+            gh release create v0.1-alpha AuraGlass-v0.1-alpha.apk \
+              --title "AURA GLASS v0.1 Alpha" \
+              --notes "Early Android launcher and live wallpaper prototype. This is a debug-signed test build, not a finished release. Live wallpaper, glass editor, animated weather card and Android widget. Android 8.0+, ARMv7/ARM64. Test on a secondary device or without selecting it as default launcher initially." \
+              --prerelease \
+              --target "${GITHUB_SHA}"
+          fi
