@@ -6,8 +6,8 @@
 
 | Component | Current implementation | What is not finished |
 |---|---|---|
-| AURA Home | Launcher HOME role, weather card, app list/search, favorites, editable dock, persistent folders, integrated access to a widget board | True multi-page drag-and-drop home grid, full backup/restore of live widget bindings, Samsung visual acceptance |
-| Widgets | Android `AppWidgetHost` workspace with system binding, provider configuration, widget height/order and removal | Native resizable widget placement directly on multiple launcher pages |
+| AURA Home | Launcher HOME role, weather card, app list/search, editable dock and folders, up to four pages with in-page drag-and-drop, plus widget board | Free-layout icon/widget grid, physical gesture tests, Samsung visual acceptance |
+| Widgets | Android `AppWidgetHost` with system binding, provider configuration, widget page/height/order and direct rendering in AURA Home | Drag-resizing widgets directly inside the desktop grid, OEM/widget-provider compatibility tests |
 | ICE GLASS | Live wallpaper, thermal frost trails, condensation/refreezing, snow, aurora, stars, galaxy, comets, moon phase, full-screen interactive preview | GPU optical refraction, final crystalline detail, measured performance and visual match on S24 Ultra |
 | AURA Island | Launcher capsule, MediaSession track/artist/transport/seek, opt-in FFT, notification cards, call-notification actions, system audio streams | Across-app overlay, advanced OEM call support, real per-app volume without supported Samsung API |
 | Updates | GitHub stable-release check **on opening Setup only**, opt-in notification, explicit download and package/hash/signature/version checks, Android installation confirmation | End-to-end stable→stable upgrade test; release key and stable assets |
@@ -22,7 +22,7 @@ After install, open AURA GLASS from the app list. The setup screen lets you **in
 
 Use the editor to choose ICE GLASS, weather, time, effects and refresh rate. Select **System / 60 FPS / 120 FPS**; 120 Hz is a request only if supported by the display, not a claim of sustained 120 FPS. Energy saver/thermal throttling may lower frame rates.
 
-From AURA Home, tap the widget icon to open the Android widget board. Long-press app icons to manage favorites, dock and folders. From Setup, use **Save settings to JSON** before uninstalling a test build; import them after reinstalling. Widgets supplied by other apps still require Android's binding/permissions.
+From AURA Home, tap the widget icon to open the Android widget board. Bound widgets appear on their selected Home page, in a scrollable section beneath shortcuts. Use the page arrows or the plus button to manage up to four workspaces. Tap **Изменить** to long-press and drag app icons between cells; app long-press menus also allow moving a shortcut to another page. Long-press app icons to manage favorites, dock and folders. From Setup, use **Save settings to JSON** before uninstalling a test build; import them after reinstalling. Widgets supplied by other apps still require Android's binding/permissions.
 
 ## Updates and security
 
