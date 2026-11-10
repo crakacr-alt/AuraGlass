@@ -101,11 +101,11 @@ public final class WeatherCardPainter {
             }
             p.setStyle(Paint.Style.FILL);
         }
-        text(canvas,"AURA WEATHER",52,64,25,0xe7ffffff,true);
-        text(canvas,s.available?s.city:"Выберите город",52,112,28,0xffffffff,false);
+        text(canvas,"AURA  •  ПОГОДА",52,64,25,0xe7ffffff,true);
+        text(canvas,s.available?s.city:"Данные о погоде",52,112,28,0xffffffff,false);
         text(canvas,s.available?(s.temp+"°"):"—",48,232,111,0xffffffff,false);
-        text(canvas,s.condition(),247,184,33,0xffffffff,true);
-        text(canvas,s.available?"Макс. "+s.max+"°   Мин. "+s.min+"°":"Настройте город в AURA",250,229,25,0xe3ffffff,false);
+        text(canvas,s.available?s.condition():"Город не выбран",247,184,33,0xffffffff,true);
+        text(canvas,s.available?"Макс. "+s.max+"°   Мин. "+s.min+"°":"Укажите город в редакторе",250,229,25,0xe3ffffff,false);
         String icon=s.symbol();
         text(canvas,icon,605,160,91,0xf7ffffff,false);
         p.setColor(0x39ffffff);canvas.drawRoundRect(new RectF(50,264,710,267),2,2,p);

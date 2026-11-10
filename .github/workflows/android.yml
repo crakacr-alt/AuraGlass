@@ -89,10 +89,7 @@ jobs:
             adb shell dumpsys package com.auraglass.app > screenshots/installed-package.txt
             grep -q "AuraWallpaperService" screenshots/installed-package.txt
             grep -q "HomeActivity" screenshots/installed-package.txt
-            if adb logcat -d -s AndroidRuntime:E | grep -F "Process: com.auraglass.app"; then
-              echo "Fatal runtime exception detected" >&2
-              exit 1
-            fi
+            ! adb logcat -d -s AndroidRuntime:E | grep -F "Process: com.auraglass.app"
             echo "✓ Setup, home and editor open; wallpaper service registered"
       - name: Save emulator evidence
         if: always()

@@ -26,14 +26,21 @@ public final class AtmospherePreviewView extends View {
         renderer.draw(c,(int)w,(int)h,SystemClock.uptimeMillis());
         p.setColor(0x20ffffff);p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(2);
         c.drawRoundRect(new RectF(1,1,w-1,h-1),rad,rad,p);p.setStyle(Paint.Style.FILL);
-        p.setColor(Color.WHITE);p.setTextSize(w*.082f);
+        p.setColor(Color.WHITE);
+        p.setTextSize(Math.min(w*.066f,h*.116f));
         p.setTypeface(android.graphics.Typeface.create("sans-serif-light",0));
-        c.drawText("AURA GLASS",w*.072f,h*.16f,p);
-        p.setTextSize(w*.035f);p.setColor(0xd9ffffff);
-        c.drawText("Живая атмосфера · предпросмотр",w*.072f,h*.205f,p);
+        c.drawText("AURA GLASS",w*.066f,h*.175f,p);
+        p.setTextSize(Math.min(w*.029f,h*.055f));
+        p.setColor(0xe1ffffff);
+        c.drawText("Адаптивные живые обои",w*.069f,h*.245f,p);
+        float cardW=w*.89f;
+        float cardH=cardW*310f/760f;
+        if(cardH>h*.43f){cardH=h*.43f;cardW=cardH*760f/310f;}
+        float cardX=(w-cardW)/2f;
+        float cardY=h-cardH-h*.07f;
         c.save();
-        c.translate(w*.06f,h*.63f);
-        weather.draw(c,getContext(),w*.88f,h*.28f,
+        c.translate(cardX,cardY);
+        weather.draw(c,getContext(),cardW,cardH,
             WeatherRepository.read(getContext()),SystemClock.uptimeMillis()/1000f);
         c.restore();
         c.restore();
