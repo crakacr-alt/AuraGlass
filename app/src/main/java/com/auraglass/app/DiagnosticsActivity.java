@@ -65,7 +65,14 @@ public final class DiagnosticsActivity extends Activity {
         return v;
     }
     private Button button(String title,Runnable click){
-        Button b=new Button(this);b.setText(title);b.setAllCaps(false);
+        Button b=new Button(this);
+        b.setText(title);b.setAllCaps(false);b.setTextSize(13);
+        b.setTextColor(0xfff6f6ff);
+        GradientDrawable bg=new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+            new int[]{0xc06f759e,0xd051537c});
+        bg.setCornerRadius(dp(15));
+        bg.setStroke(dp(1),0x74f3ffff);
+        b.setBackground(bg);
         b.setOnClickListener(v->click.run());return b;
     }
     @Override public void onCreate(Bundle saved){
@@ -86,6 +93,8 @@ public final class DiagnosticsActivity extends Activity {
         TextView subtitle=text("Проверки выполняются локально и только по нажатию.",12);
         subtitle.setTextColor(0xffc4cfe6);body.addView(subtitle);
         baseline=text("",13);
+        baseline.setPadding(dp(14),dp(14),dp(14),dp(14));
+        baseline.setBackground(surface());
         LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(-1,-2);
         bp.topMargin=dp(10);bp.bottomMargin=dp(8);
         body.addView(baseline,bp);
@@ -97,6 +106,8 @@ public final class DiagnosticsActivity extends Activity {
         measureButton=button("Измерить 8 секунд",this::startMeasurement);
         body.addView(measureButton,new LinearLayout.LayoutParams(-1,dp(52)));
         results=text("Для проверки кадров нажмите кнопку. Это измерение тестовой сцены, не всего One UI.",12);
+        results.setPadding(dp(12),dp(9),dp(12),dp(10));
+        results.setTextColor(0xffcedef7);
         body.addView(results,new LinearLayout.LayoutParams(-1,-2));
         body.addView(button("Обновить сведения об устройстве",()->baseline.setText(reportDevice())),
             new LinearLayout.LayoutParams(-1,dp(50)));

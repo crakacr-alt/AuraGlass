@@ -9,6 +9,7 @@ import android.appwidget.AppWidgetProviderInfo;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
 import android.graphics.Typeface;
 import android.os.Bundle;
 import android.view.Gravity;
@@ -49,10 +50,19 @@ public final class WidgetBoardActivity extends Activity {
         if(bold)t.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));
         return t;
     }
+    private GradientDrawable glass(int first,int second,int radius){
+        GradientDrawable g=new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+            new int[]{first,second});
+        g.setCornerRadius(dp(radius));
+        g.setStroke(dp(1),0x78eaf3ff);
+        return g;
+    }
     private Button action(String label,Runnable runnable){
         Button b=new Button(this);
         b.setAllCaps(false);
         b.setTextSize(13);
+        b.setTextColor(0xfff5f7ff);
+        b.setBackground(glass(0xc0646f9b,0xc04f547f,14));
         b.setText(label);
         b.setOnClickListener(v->runnable.run());
         return b;
@@ -72,7 +82,9 @@ public final class WidgetBoardActivity extends Activity {
         getWindow().setStatusBarColor(0xff1c2239);
         getWindow().setNavigationBarColor(0xff121829);
         FrameLayout surface=new FrameLayout(this);
-        surface.setBackgroundColor(0xf0192235);
+        surface.setBackground(new GradientDrawable(
+            GradientDrawable.Orientation.TL_BR,
+            new int[]{0xd3172237,0xc02c2846,0xd0122135}));
         setContentView(surface);
         ScrollView scroll=new ScrollView(this);
         scroll.setFillViewport(true);
@@ -171,7 +183,8 @@ public final class WidgetBoardActivity extends Activity {
             LinearLayout card=new LinearLayout(this);
             card.setOrientation(LinearLayout.VERTICAL);
             card.setPadding(dp(9),dp(10),dp(9),dp(10));
-            card.setBackgroundColor(0xaa343b55);
+            card.setBackground(glass(0xce475376,0xd13b425f,20));
+            card.setElevation(dp(2));
             LinearLayout labelRow=new LinearLayout(this);
             TextView widgetName=text(provider.loadLabel(getPackageManager()),13,true);
             labelRow.addView(widgetName,new LinearLayout.LayoutParams(0,dp(34),1));
@@ -209,13 +222,17 @@ public final class WidgetBoardActivity extends Activity {
         if(ids.isEmpty()){
             TextView empty=text("Пока нет виджетов. Нажми «Добавить» и выбери календарь, "+
                 "часы, задачи или виджет установленного приложения.",14,false);
-            empty.setPadding(dp(15),dp(24),dp(15),dp(24));
+            empty.setPadding(dp(17),dp(22),dp(17),dp(22));
+            empty.setBackground(glass(0x79465b7e,0x70505079,20));
+            empty.setTextColor(0xffedf7ff);
             content.addView(empty);
         }
         TextView note=text("Виджеты сторонних приложений могут выглядеть по-своему. "+
             "AURA не подменяет их содержимое и не запрашивает доступ к личным данным.",11,false);
         note.setTextColor(0xffaebcd4);
-        content.addView(note);
+        LinearLayout.LayoutParams noteLp=new LinearLayout.LayoutParams(-1,-2);
+        noteLp.topMargin=dp(16);
+        content.addView(note,noteLp);
     }
 
     private void chooseProvider(){
