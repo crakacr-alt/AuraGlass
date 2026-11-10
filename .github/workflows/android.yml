@@ -100,6 +100,9 @@ jobs:
             adb exec-out screencap -p > screenshots/07-ice-finger-trail.png
             sleep 4
             adb exec-out screencap -p > screenshots/08-ice-refreeze.png
+            adb shell am start -W -n com.auraglass.app/.HomeActivity
+            sleep 5
+            adb exec-out screencap -p > screenshots/09-snowy-glass-home.png
             test "$(stat -c %s screenshots/06-ice-before.png)" -gt 90000
             test "$(stat -c %s screenshots/07-ice-finger-trail.png)" -gt 90000
             adb shell am start -W -a android.service.wallpaper.CHANGE_LIVE_WALLPAPER --ecn android.service.wallpaper.extra.LIVE_WALLPAPER_COMPONENT com.auraglass.app/.AuraWallpaperService
@@ -115,7 +118,7 @@ jobs:
             grep -q "com.auraglass.app" screenshots/home-role.txt
             ! adb logcat -d -s AndroidRuntime:E | grep -F "Process: com.auraglass.app"
             # A blocking system dialog invalidates visual acceptance, even if AURA survived.
-            if grep -E 'ANR in (com\\.android\\.launcher3|com\\.google\\.android\\.apps\\.nexuslauncher)' screenshots/device-logcat.txt; then
+            if grep -E 'ANR in (com[.]android[.]launcher3|com[.]google[.]android[.]apps[.]nexuslauncher)' screenshots/device-logcat.txt; then
               echo "System launcher ANR invalidated the screen capture" >&2
               exit 1
             fi
