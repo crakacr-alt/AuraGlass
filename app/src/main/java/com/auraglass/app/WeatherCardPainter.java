@@ -11,6 +11,9 @@ import java.util.Calendar;
 /** One shared visual specification for home animated card and system widget snapshot. */
 public final class WeatherCardPainter {
     private final Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final SolarLighting solarLighting=new SolarLighting();
+    private final float[] solarLevels=new float[2];
+    private String cachedRise="",cachedSet="";
     public void draw(Canvas canvas,Context ctx,float width,float height,WeatherRepository.Snapshot s,float seconds){
         if(width<=0||height<=0)return;
         if(Config.bool(ctx,"reduce_motion",false))seconds=0;
@@ -25,6 +28,16 @@ public final class WeatherCardPainter {
         String period=Config.str(ctx,"time_mode","auto");
         boolean night="night".equals(period)||("auto".equals(period)&&(hour>=20||hour<6));
         boolean evening="evening".equals(period)||("auto".equals(period)&&(hour>=17&&hour<20));
+        if("auto".equals(period)&&s.available){
+            if(!s.solarRises.equals(cachedRise)||!s.solarSets.equals(cachedSet)){
+                solarLighting.load(s.solarRises,s.solarSets);
+                cachedRise=s.solarRises;cachedSet=s.solarSets;
+            }
+            if(solarLighting.sample(System.currentTimeMillis(),solarLevels)){
+                night=solarLevels[0]<.13f&&solarLevels[1]<.13f;
+                evening=!night&&solarLevels[1]>=.13f;
+            }
+        }
         int[] palette=night?new int[]{0xdf354264,0xe55a5d8e,0xd2485b7e}:
             evening?new int[]{0xe5e6b4ca,0xd9b99eb6,0xb5998eb5}:
             new int[]{0xc9dedaf0,0xc69caccd,0x998e95bb};

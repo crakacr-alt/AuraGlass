@@ -19,6 +19,14 @@ public final class QaEntryActivity extends Activity {
         }
         String target=getIntent()==null?"":getIntent().getStringExtra("target");
         Class<? extends Activity> page=null;
+        if("solar_cycle".equals(target)){
+            try{android.util.Log.i("AURA_QA",SolarSelfTest.run());}
+            catch(Throwable e){
+                android.util.Log.e("AURA_QA","SOLAR_CYCLE_EXCEPTION",e);
+                android.util.Log.i("AURA_QA","SOLAR_CYCLE_FAILED");
+            }
+            finish();return;
+        }
         if("ice_physics".equals(target)){
             new Thread(()->{
                 try{

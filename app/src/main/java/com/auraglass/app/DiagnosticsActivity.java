@@ -136,6 +136,13 @@ public final class DiagnosticsActivity extends Activity {
         s.append("\nДисплей сейчас: ").append(String.format(Locale.ROOT,"%.1f",RefreshRateSupport.currentHz(this))).append(" Гц");
         s.append("\nМаксимум: ").append(String.format(Locale.ROOT,"%.1f",RefreshRateSupport.maximumHz(this))).append(" Гц");
         s.append("\nВыбранный режим: ").append(Config.str(this,"frame_rate","auto"));
+        WeatherRepository.Snapshot climate=WeatherRepository.read(this);
+        SolarLighting sunlight=new SolarLighting();
+        sunlight.load(climate.solarRises,climate.solarSets);
+        float[] solarOutput=new float[2];
+        s.append("\\nОсвещение: ").append(
+            sunlight.sample(System.currentTimeMillis(),solarOutput)?
+                "по восходу/закату выбранного города":"без прогноза — приблизительно");
         s.append("\nЛаунчер по умолчанию: ").append(Activation.isHomeActive(this)?"AURA":"другой");
         s.append("\nОбои AURA: ").append(Activation.isLiveWallpaperActive(this)?"включены":"не выбраны");
         s.append("\nДоступ к уведомлениям: ").append(AuraEventListener.granted(this)?"разрешён":"нет");
