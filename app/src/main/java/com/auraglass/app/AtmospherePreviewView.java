@@ -14,6 +14,13 @@ public final class AtmospherePreviewView extends View {
     private final AtmosphereRenderer renderer=new AtmosphereRenderer();
     private final WeatherCardPainter weather=new WeatherCardPainter();
     private final Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Path clippedPreview=new Path();
+    private final RectF previewBounds=new RectF();
+    private final RectF strokeBounds=new RectF();
+    private final android.graphics.Typeface headingTypeface=
+        android.graphics.Typeface.create("sans-serif-light",0);
+    private WeatherRepository.Snapshot cachedWeather;
+    private long lastWeatherRead;
     private boolean running;
     private final RenderBudget budget;
     private final ParallaxMotion motion;
@@ -25,8 +32,17 @@ public final class AtmospherePreviewView extends View {
     }
     public void reload(){
         renderer.reload(getContext());
+        lastWeatherRead=0;
         motion.stop();if(running)motion.start();
         invalidate();
+    }
+    @Override protected void onSizeChanged(int w,int h,int oldw,int oldh){
+        super.onSizeChanged(w,h,oldw,oldh);
+        float radius=28*getResources().getDisplayMetrics().density;
+        clippedPreview.rewind();
+        previewBounds.set(0,0,w,h);
+        clippedPreview.addRoundRect(previewBounds,radius,radius,Path.Direction.CW);
+        strokeBounds.set(1,1,Math.max(1,w-1),Math.max(1,h-1));
     }
     @Override protected void onDraw(Canvas c){
         super.onDraw(c);
@@ -34,15 +50,16 @@ public final class AtmospherePreviewView extends View {
         if(w<=1||h<=1)return;
         float rad=28*getResources().getDisplayMetrics().density;
         c.save();
-        Path clip=new Path();clip.addRoundRect(new RectF(0,0,w,h),rad,rad,Path.Direction.CW);c.clipPath(clip);
+        c.clipPath(clippedPreview);
         long start=SystemClock.uptimeMillis();
         renderer.setRenderQuality(budget.quality());
         renderer.draw(c,(int)w,(int)h,start);
         p.setColor(0x20ffffff);p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(2);
-        c.drawRoundRect(new RectF(1,1,w-1,h-1),rad,rad,p);p.setStyle(Paint.Style.FILL);
+        c.drawRoundRect(strokeBounds,rad,rad,p);
+        p.setStyle(Paint.Style.FILL);
         p.setColor(Color.WHITE);
         p.setTextSize(Math.min(w*.066f,h*.116f));
-        p.setTypeface(android.graphics.Typeface.create("sans-serif-light",0));
+        p.setTypeface(headingTypeface);
         c.drawText("AURA GLASS",w*.066f,h*.175f,p);
         p.setTextSize(Math.min(w*.029f,h*.055f));
         p.setColor(0xe1ffffff);
@@ -54,11 +71,15 @@ public final class AtmospherePreviewView extends View {
         float cardY=h-cardH-h*.07f;
         c.save();
         c.translate(cardX,cardY);
+        if(cachedWeather==null||start-lastWeatherRead>=30000){
+            cachedWeather=WeatherRepository.read(getContext());
+            lastWeatherRead=start;
+        }
         weather.draw(c,getContext(),cardW,cardH,
-            WeatherRepository.read(getContext()),SystemClock.uptimeMillis()/1000f);
+            cachedWeather,start/1000f);
         c.restore();
         c.restore();
-        if(running)postInvalidateDelayed(budget.nextDelay(start,SystemClock.uptimeMillis()-start));
+        if(running)FramePacer.schedule(this,budget,start);
     }
     @Override public boolean onTouchEvent(MotionEvent event){
         if(event==null)return false;

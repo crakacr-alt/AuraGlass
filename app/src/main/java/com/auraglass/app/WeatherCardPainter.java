@@ -4,6 +4,7 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.LinearGradient;
 import android.graphics.Paint;
+import android.graphics.Typeface;
 import android.graphics.RectF;
 import android.graphics.Shader;
 import java.util.Calendar;
@@ -11,6 +12,19 @@ import java.util.Calendar;
 /** One shared visual specification for home animated card and system widget snapshot. */
 public final class WeatherCardPainter {
     private final Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final RectF cardRect=new RectF(4,4,756,306);
+    private final RectF dividerRect=new RectF(50,264,710,267);
+    private final Typeface medium=Typeface.create("sans-serif-medium",0);
+    private final Typeface regular=Typeface.create("sans-serif",0);
+    // Three immutable day / sunset / night palettes, not a new shader each frame.
+    private final Shader nightShader=new LinearGradient(0,0,760,310,
+        new int[]{0xdf354264,0xe55a5d8e,0xd2485b7e},null,Shader.TileMode.CLAMP);
+    private final Shader sunsetShader=new LinearGradient(0,0,760,310,
+        new int[]{0xe5e6b4ca,0xd9b99eb6,0xb5998eb5},null,Shader.TileMode.CLAMP);
+    private final Shader dayShader=new LinearGradient(0,0,760,310,
+        new int[]{0xc9dedaf0,0xc69caccd,0x998e95bb},null,Shader.TileMode.CLAMP);
+    private long lastClockRead;
+    private int cachedHour;
     private final SolarLighting solarLighting=new SolarLighting();
     private final float[] solarLevels=new float[2];
     private String cachedRise="",cachedSet="";
@@ -20,11 +34,14 @@ public final class WeatherCardPainter {
         canvas.save();
         float sx=width/760f,sy=height/310f;
         canvas.scale(sx,sy);
-        RectF b=new RectF(4,4,756,306);
+        RectF b=cardRect;
         p.setStyle(Paint.Style.FILL);
-
-        Calendar clock=Calendar.getInstance();
-        int hour=clock.get(Calendar.HOUR_OF_DAY);
+        long now=System.currentTimeMillis();
+        if(lastClockRead==0||now<lastClockRead||now-lastClockRead>=10000){
+            cachedHour=Calendar.getInstance().get(Calendar.HOUR_OF_DAY);
+            lastClockRead=now;
+        }
+        int hour=cachedHour;
         String period=Config.str(ctx,"time_mode","auto");
         boolean night="night".equals(period)||("auto".equals(period)&&(hour>=20||hour<6));
         boolean evening="evening".equals(period)||("auto".equals(period)&&(hour>=17&&hour<20));
@@ -38,10 +55,7 @@ public final class WeatherCardPainter {
                 evening=!night&&solarLevels[1]>=.13f;
             }
         }
-        int[] palette=night?new int[]{0xdf354264,0xe55a5d8e,0xd2485b7e}:
-            evening?new int[]{0xe5e6b4ca,0xd9b99eb6,0xb5998eb5}:
-            new int[]{0xc9dedaf0,0xc69caccd,0x998e95bb};
-        p.setShader(new LinearGradient(0,0,760,310,palette,null,Shader.TileMode.CLAMP));
+        p.setShader(night?nightShader:evening?sunsetShader:dayShader);
         canvas.drawRoundRect(b,52,52,p);p.setShader(null);
         p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(2);
         p.setColor(0x96ffffff);canvas.drawRoundRect(b,52,52,p);
@@ -121,13 +135,13 @@ public final class WeatherCardPainter {
         text(canvas,s.available?"Макс. "+s.max+"°   Мин. "+s.min+"°":"Укажите город в редакторе",250,229,25,0xe3ffffff,false);
         String icon=s.symbol();
         text(canvas,icon,605,160,91,0xf7ffffff,false);
-        p.setColor(0x39ffffff);canvas.drawRoundRect(new RectF(50,264,710,267),2,2,p);
+        p.setColor(0x39ffffff);
+        canvas.drawRoundRect(dividerRect,2,2,p);
         canvas.restore();
     }
     private void text(Canvas c,String s,float x,float y,float size,int color,boolean bold){
         p.setShader(null);p.setStyle(Paint.Style.FILL);
-        p.setColor(color);p.setTypeface(bold?android.graphics.Typeface.create("sans-serif-medium",0):
-            android.graphics.Typeface.create("sans-serif",0));
+        p.setColor(color);p.setTypeface(bold?medium:regular);
         p.setTextSize(size);
         c.drawText(s,x,y,p);
     }

@@ -64,8 +64,7 @@ public final class WeatherCardView extends View {
             ripplePaint.setShader(null);
         }
         if(running&&isShown())
-            postInvalidateDelayed(budget.nextDelay(frameStart,
-                SystemClock.uptimeMillis()-frameStart));
+            FramePacer.schedule(this,budget,frameStart);
     }
     @Override public boolean onTouchEvent(MotionEvent event){
         int action=event.getActionMasked();

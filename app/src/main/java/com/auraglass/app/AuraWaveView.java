@@ -58,8 +58,7 @@ public final class AuraWaveView extends View {
         }
         paint.setShader(null);
         if(actualAudio&&getWindowVisibility()==VISIBLE&&isShown()){
-            postInvalidateDelayed(budget.nextDelay(start,
-                android.os.SystemClock.uptimeMillis()-start));
+            FramePacer.schedule(this,budget,start);
         }
     }
 }

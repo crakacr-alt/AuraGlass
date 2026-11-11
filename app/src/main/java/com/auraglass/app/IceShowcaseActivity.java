@@ -64,7 +64,7 @@ public final class IceShowcaseActivity extends Activity {
             c.drawText("Иней вернётся постепенно",dp(23),getHeight()-dp(96),type);
             c.drawText("Назад  ·  выйти из предпросмотра",dp(23),getHeight()-dp(45),type);
             type.clearShadowLayer();
-            if(active)postInvalidateDelayed(budget.nextDelay(start,SystemClock.uptimeMillis()-start));
+            if(active)FramePacer.schedule(this,budget,start);
         }
         @Override public boolean onTouchEvent(MotionEvent event){
             int action=event.getActionMasked();
