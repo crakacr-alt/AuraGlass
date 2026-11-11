@@ -82,6 +82,12 @@ public final class WidgetBoardActivity extends Activity {
         host=new AppWidgetHost(this,HOST_ID);
         selectedHomePage=Math.max(0,Math.min(WorkspacePager.pageCount(this)-1,
             getIntent().getIntExtra("home_page",0)));
+        if(state!=null){
+            selectedHomePage=Math.max(0,Math.min(WorkspacePager.pageCount(this)-1,
+                state.getInt("widget_selected_page",selectedHomePage)));
+            pendingId=state.getInt("widget_pending_id",
+                AppWidgetManager.INVALID_APPWIDGET_ID);
+        }
         getWindow().setStatusBarColor(0xff1c2239);
         getWindow().setNavigationBarColor(0xff121829);
         FrameLayout surface=new FrameLayout(this);
@@ -319,13 +325,22 @@ public final class WidgetBoardActivity extends Activity {
         }
         pendingId=AppWidgetManager.INVALID_APPWIDGET_ID;
     }
+    @Override protected void onSaveInstanceState(Bundle state){
+        state.putInt("widget_pending_id",pendingId);
+        state.putInt("widget_selected_page",selectedHomePage);
+        super.onSaveInstanceState(state);
+    }
     @Override protected void onActivityResult(int request,int result,Intent data){
         super.onActivityResult(request,result,data);
         if(request!=REQUEST_BIND&&request!=REQUEST_CONFIG)return;
         if(result!=RESULT_OK){discardPending();return;}
         int id=data==null?pendingId:data.getIntExtra(
             AppWidgetManager.EXTRA_APPWIDGET_ID,pendingId);
-        if(id<=0){discardPending();return;}
+        if(id<=0||id!=pendingId){
+            discardPending();
+            message("Android вернул неподходящий идентификатор виджета");
+            return;
+        }
         if(request==REQUEST_BIND)configureOrSave(id);
         else saveWidget(id);
     }
