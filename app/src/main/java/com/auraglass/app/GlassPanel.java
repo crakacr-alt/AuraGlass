@@ -18,6 +18,25 @@ import android.widget.FrameLayout;
 /** Glass card with tactile thermal/optical response, without stealing child clicks. */
 public final class GlassPanel extends FrameLayout {
     private final Paint sparkle=new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Shader warmRipple=new RadialGradient(0,0,1f,
+        new int[]{0x2beafbff,0x1dcceff9,0x00ffffff},
+        new float[]{0,.35f,1},Shader.TileMode.CLAMP);
+
+    // A static cold film is shared by untouched cards. This avoids creating
+    // ~6 MB of heat/bitmap arrays for every visible panel on the Home screen.
+    // A card gets its own thermal layer only while the user draws on it.
+    private static final class IdleFilm {
+        static final IceGlassLayer LAYER=new IceGlassLayer();
+        static float intensity=Float.NaN;
+        static boolean reducedMotion;
+        static void configure(float desired,boolean reduced){
+            if(Float.isNaN(intensity)||Math.abs(desired-intensity)>.003f||
+                reducedMotion!=reduced){
+                intensity=desired;reducedMotion=reduced;
+                LAYER.configure(desired,1f,.035f,false,reduced);
+            }
+        }
+    }
     private final Path clip=new Path();
     private final RectF bounds=new RectF();
     private IceGlassLayer ice;
@@ -83,6 +102,7 @@ public final class GlassPanel extends FrameLayout {
         float strength=frostStrength();
         long now=SystemClock.uptimeMillis();
         boolean transientCold=lastWarmAt>0&&now-lastWarmAt<16000;
+        if(ice!=null&&!transientCold&&!holding)ice=null;
         if(w>0&&h>0){
             bounds.set(0,0,w,h);
             clip.reset();
@@ -93,8 +113,12 @@ public final class GlassPanel extends FrameLayout {
             canvas.save();
             canvas.clipPath(clip);
             if(strength>.01f){
-                if(ice==null)ice=new IceGlassLayer();
-                ice.draw(canvas,getWidth(),getHeight(),now,strength);
+                if(ice!=null)ice.draw(canvas,getWidth(),getHeight(),now,strength);
+                else{
+                    IdleFilm.configure(Config.number(getContext(),"frost_strength",.92f),
+                        Config.bool(getContext(),"reduce_motion",false));
+                    IdleFilm.LAYER.draw(canvas,getWidth(),getHeight(),now,strength);
+                }
             }
             canvas.restore();
         }
@@ -119,15 +143,16 @@ public final class GlassPanel extends FrameLayout {
             float fade=(1-Math.max(0,Math.min(1,age)));
             float d=getResources().getDisplayMetrics().density;
             float radius=(holding?56:58+age*84)*d;
-            int alpha=(int)(43*fade);
-            sparkle.setShader(new RadialGradient(pressedX,pressedY,radius,
-                new int[]{(alpha<<24)|0x00eafbff,((int)(29*fade)<<24)|0x00cceff9,0x00ffffff},
-                new float[]{0,.35f,1},Shader.TileMode.CLAMP));
+            sparkle.setShader(warmRipple);
+            sparkle.setAlpha((int)(255*fade));
             canvas.save();
             canvas.clipPath(clip);
-            canvas.drawCircle(pressedX,pressedY,radius,sparkle);
+            canvas.translate(pressedX,pressedY);
+            canvas.scale(radius,radius);
+            canvas.drawCircle(0f,0f,1f,sparkle);
             canvas.restore();
             sparkle.setShader(null);
+            sparkle.setAlpha(255);
             if(!Config.bool(getContext(),"reduce_motion",false))postInvalidateDelayed(18);
         }else if(transientCold && strength>.01f){
             // Only active melting/refreezing is updated. Idle glass panels do not animate.
@@ -138,17 +163,28 @@ public final class GlassPanel extends FrameLayout {
     private static final class GlassSurface extends Drawable {
         private final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Context context;
+        private final RectF rect=new RectF();
+        private Shader surfaceShader;
+        private int shaderWidth=-1,shaderHeight=-1;
+        private float shaderOpacity=-1f;
         GlassSurface(Context ctx){context=ctx;}
         @Override public void draw(Canvas canvas){
             float d=context.getResources().getDisplayMetrics().density;
             float w=getBounds().width(),h=getBounds().height();
             float r=27*d;
             float opacity=Config.number(context,"glass",.67f);
-            RectF rect=new RectF(1*d,1*d,Math.max(1,w-1*d),Math.max(1,h-1*d));
+            rect.set(1*d,1*d,Math.max(1,w-1*d),Math.max(1,h-1*d));
             paint.setStyle(Paint.Style.FILL);
-            paint.setShader(new LinearGradient(0,0,w,Math.max(1,h),
-                Color.argb((int)(205*opacity),225,223,242),
-                Color.argb((int)(153*opacity),114,130,166),Shader.TileMode.CLAMP));
+            int wi=Math.round(w),he=Math.round(h);
+            if(surfaceShader==null||shaderWidth!=wi||shaderHeight!=he||
+                Math.abs(shaderOpacity-opacity)>.004f){
+                shaderWidth=wi;shaderHeight=he;shaderOpacity=opacity;
+                surfaceShader=new LinearGradient(0,0,w,Math.max(1,h),
+                    Color.argb((int)(205*opacity),225,223,242),
+                    Color.argb((int)(153*opacity),114,130,166),
+                    Shader.TileMode.CLAMP);
+            }
+            paint.setShader(surfaceShader);
             canvas.drawRoundRect(rect,r,r,paint);
             paint.setShader(null);
             paint.setStyle(Paint.Style.STROKE);
