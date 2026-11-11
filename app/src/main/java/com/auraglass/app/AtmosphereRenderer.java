@@ -27,6 +27,8 @@ public final class AtmosphereRenderer {
     private final float[] solarLevels=new float[2];
     private float animatedDaylight=Float.NaN,animatedTwilight=Float.NaN;
     private java.util.TimeZone cityTimezone=java.util.TimeZone.getDefault();
+    private long cachedClockAt=0;
+    private float cachedClockHour=12f;
     private final float[] rx=new float[125],ry=new float[125],rv=new float[125],rs=new float[125];
     private String mode="auto", period="auto";
     private float intensity=.58f,speed=.65f;
@@ -72,6 +74,7 @@ public final class AtmosphereRenderer {
             java.util.Arrays.asList(java.util.TimeZone.getAvailableIDs()).contains(zone))
             cityTimezone=java.util.TimeZone.getTimeZone(zone);
         else cityTimezone=java.util.TimeZone.getDefault();
+        cachedClockAt=0;
         wind=Math.max(-1f,Math.min(1f,climate.wind/28f));
         boolean manual=!"auto".equals(mode);
         climateBoost=ClimateGlass.frostBoost(climate,manual);
@@ -125,8 +128,15 @@ public final class AtmosphereRenderer {
         if("day".equals(period))return 13.5f;
         if("evening".equals(period))return 18.3f;
         if("night".equals(period))return 1.5f;
-        Calendar cal=Calendar.getInstance(cityTimezone);
-        return cal.get(Calendar.HOUR_OF_DAY)+cal.get(Calendar.MINUTE)/60f;
+        // At 120 Hz, avoid allocating a Calendar on every frame.
+        long now=System.currentTimeMillis();
+        if(cachedClockAt==0||now<cachedClockAt||now-cachedClockAt>=2000){
+            Calendar cal=Calendar.getInstance(cityTimezone);
+            cachedClockHour=cal.get(Calendar.HOUR_OF_DAY)+cal.get(Calendar.MINUTE)/60f+
+                cal.get(Calendar.SECOND)/3600f;
+            cachedClockAt=now;
+        }
+        return (cachedClockHour+(now-cachedClockAt)/3600000f)%24f;
     }
     public void draw(Canvas c,int width,int height,long ms){
         if(width<=0||height<=0)return;

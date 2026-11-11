@@ -140,7 +140,7 @@ public final class DiagnosticsActivity extends Activity {
         SolarLighting sunlight=new SolarLighting();
         sunlight.load(climate.solarRises,climate.solarSets);
         float[] solarOutput=new float[2];
-        s.append("\\nОсвещение: ").append(
+        s.append("\nОсвещение: ").append(
             sunlight.sample(System.currentTimeMillis(),solarOutput)?
                 "по восходу/закату выбранного города":"без прогноза — приблизительно");
         s.append("\nЛаунчер по умолчанию: ").append(Activation.isHomeActive(this)?"AURA":"другой");
