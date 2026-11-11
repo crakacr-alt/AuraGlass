@@ -15,6 +15,11 @@ import java.util.Random;
 /** Shared deterministic scene renderer: wallpaper and in-app preview use identical weather/light rules. */
 public final class AtmosphereRenderer {
     private final Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);
+    // Cached aura curtains: expensive shader objects are rebuilt only on resize,
+    // never twenty times on every 120 Hz frame.
+    private final Path auroraCurtainPath=new Path();
+    private final LinearGradient[][] auroraGradients=new LinearGradient[4][5];
+    private int auroraGradientHeight=-1;
     private final IceGlassLayer iceGlass=new IceGlassLayer();
     private final CelestialLayer celestial=new CelestialLayer();
     private final MoonPhase moonPhase=new MoonPhase();
@@ -211,39 +216,54 @@ public final class AtmosphereRenderer {
         p.setShader(new RadialGradient(x,y,radius,color,alpha(color,0),Shader.TileMode.CLAMP));
         c.drawCircle(x,y,radius,p);p.setShader(null);
     }
+    private void ensureAuroraShaders(float height){
+        int measured=Math.max(1,Math.round(height));
+        if(auroraGradientHeight==measured)return;
+        auroraGradientHeight=measured;
+        for(int curtain=0;curtain<4;curtain++){
+            int color=curtain%3==0?0xff6ef9d9:curtain%3==1?0xff92b8ff:0xffc78eff;
+            float base=height*(.06f+curtain*.032f);
+            for(int layer=0;layer<5;layer++)
+                auroraGradients[curtain][layer]=new LinearGradient(
+                    0,base,0,base+height*.23f,
+                    alpha(color,26-layer*3),alpha(color,0),Shader.TileMode.CLAMP);
+        }
+    }
     private void drawAurora(Canvas c,float w,float h,float t,float night){
-        // Layered curtains: slowly moving harmonics, feathered vertical falloff.
+        // Reuse a single Path and 20 cached shaders on 60/120 Hz displays.
+        // Path vertices still change with time to preserve fluid motion.
+        ensureAuroraShaders(h);
         int curtains=renderQuality<.6f?2:4;
+        int layers=renderQuality<.6f?3:5;
+        p.setStyle(Paint.Style.FILL);
         for(int curtain=0;curtain<curtains;curtain++){
-            int col=curtain%3==0?0xff6ef9d9:curtain%3==1?0xff92b8ff:0xffc78eff;
             float base=h*(.06f+curtain*.032f);
-            int layers=renderQuality<.6f?3:5;
             for(int layer=0;layer<layers;layer++){
                 float strip=h*(.044f+layer*.024f);
-                Path shape=new Path();
+                auroraCurtainPath.rewind();
                 for(int n=0;n<=32;n++){
                     float x=w*(n/32f*1.23f-.13f);
-                    float s=(float)Math.sin(n*.27f+t*.13f+curtain*.83f);
+                    float a=(float)Math.sin(n*.27f+t*.13f+curtain*.83f);
                     float fold=(float)Math.sin(n*.57f-t*.064f+curtain*1.3f);
-                    float y=base+h*.034f*s+h*.024f*fold+layer*h*.006f;
-                    if(n==0)shape.moveTo(x,y);
-                    else shape.lineTo(x,y);
+                    float y=base+h*.034f*a+h*.024f*fold+layer*h*.006f;
+                    if(n==0)auroraCurtainPath.moveTo(x,y);
+                    else auroraCurtainPath.lineTo(x,y);
                 }
                 for(int n=32;n>=0;n--){
                     float x=w*(n/32f*1.23f-.13f);
-                    float s=(float)Math.sin(n*.27f+t*.13f+curtain*.83f);
+                    float a=(float)Math.sin(n*.27f+t*.13f+curtain*.83f);
                     float fold=(float)Math.sin(n*.57f-t*.064f+curtain*1.3f);
-                    float y=base+h*.034f*s+h*.024f*fold+layer*h*.006f+strip;
-                    shape.lineTo(x,y);
+                    float y=base+h*.034f*a+h*.024f*fold+layer*h*.006f+strip;
+                    auroraCurtainPath.lineTo(x,y);
                 }
-                shape.close();
-                p.setStyle(Paint.Style.FILL);
-                p.setShader(new LinearGradient(0,base,0,base+h*.23f,
-                    alpha(col,(int)(night*(26-layer*3))),alpha(col,0),Shader.TileMode.CLAMP));
-                c.drawPath(shape,p);
+                auroraCurtainPath.close();
+                p.setShader(auroraGradients[curtain][layer]);
+                p.setAlpha(Math.max(0,Math.min(255,(int)(night*255))));
+                c.drawPath(auroraCurtainPath,p);
                 p.setShader(null);
             }
         }
+        p.setAlpha(255);
     }
     private void drawRidge(Canvas c,float w,float h,float t,float day,float eve){
         for(int layer=0;layer<3;layer++){
