@@ -37,10 +37,15 @@ public final class DiagnosticsActivity extends Activity {
     private Button measureButton;
     private DiagnosticScene scene;
     private boolean collecting,listenerRegistered;
+    private long droppedReports;
+    private int sampledRefreshChanges;
+    private float firstDisplayHz;
+    private float lastDisplayHz;
     private long started;
     private String measurement="Не выполнялось";
     private final Window.OnFrameMetricsAvailableListener listener=(window,metrics,dropped)->{
         if(!collecting)return;
+        if(dropped>0)droppedReports+=dropped;
         long ns=metrics.getMetric(FrameMetrics.TOTAL_DURATION);
         if(ns>0&&ns<1000000000L&&frameDurations.size()<2500)
             frameDurations.add(ns);
@@ -154,6 +159,10 @@ public final class DiagnosticsActivity extends Activity {
     private void startMeasurement(){
         if(collecting)return;
         frameDurations.clear();
+        droppedReports=0;
+        sampledRefreshChanges=0;
+        firstDisplayHz=RefreshRateSupport.currentHz(this);
+        lastDisplayHz=firstDisplayHz;
         measurement="Выполняется тест 8 секунд…";
         results.setText(measurement);
         measureButton.setEnabled(false);
@@ -164,6 +173,7 @@ public final class DiagnosticsActivity extends Activity {
             collecting=true;
             started=SystemClock.elapsedRealtime();
             scene.start();
+            main.post(refreshSampler);
             main.postDelayed(finish,8000);
         }catch(RuntimeException e){
             collecting=false;
@@ -172,11 +182,21 @@ public final class DiagnosticsActivity extends Activity {
             results.setText(measurement);
         }
     }
+    private final Runnable refreshSampler=new Runnable(){
+        @Override public void run(){
+            if(!collecting)return;
+            float hz=RefreshRateSupport.currentHz(DiagnosticsActivity.this);
+            if(Math.abs(hz-lastDisplayHz)>1f)sampledRefreshChanges++;
+            lastDisplayHz=hz;
+            main.postDelayed(this,500);
+        }
+    };
     private void finishMeasurement(){
         if(!collecting)return;
         collecting=false;
         scene.stop();
         main.removeCallbacks(finish);
+        main.removeCallbacks(refreshSampler);
         if(listenerRegistered){
             try{getWindow().removeOnFrameMetricsAvailableListener(listener);}
             catch(RuntimeException ignored){}
@@ -202,10 +222,13 @@ public final class DiagnosticsActivity extends Activity {
                 "Тестовая сцена, %d мс\nКадров: %d\nСреднее время кадра: %.2f мс\n"+
                 "95-й процентиль: %.2f мс\nКадров длиннее бюджета %.2f мс: %d (%.1f%%)\n"+
                 "Запрошенная частота: %.1f Гц\n"+
+                "Реальная частота дисплея: %.1f → %.1f Гц (изменений: %d)\n"+
+                "Сообщения о пропущенных кадрах: %d\n"+
                 "Важно: FrameMetrics измеряет кадры только этого окна. "+
                 "Результат не подтверждает реальную частоту обоев, анимаций лаунчера и игр.",
                 elapsed,count,sum/(double)count/1000000,p95/1000000.0,budget/1000000,
-                slow,slow*100.0/count,RefreshRateSupport.requestedHz(this));
+                slow,slow*100.0/count,RefreshRateSupport.requestedHz(this),
+                firstDisplayHz,lastDisplayHz,sampledRefreshChanges,droppedReports);
         }
         results.setText(measurement);
         measureButton.setEnabled(true);
