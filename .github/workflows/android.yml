@@ -94,6 +94,13 @@ jobs:
             # Debug-only trampoline verifies internal pages without exporting
             # their production manifest components to other applications.
             # Verify persistent folder CRUD using real SharedPreferences in debug APK.
+            # Quantitative frost QA: real melt/re-freeze on the Android renderer,
+            # rather than trusting a large screenshot's file size.
+            adb logcat -c
+            adb shell am start -W -n com.auraglass.app/.QaEntryActivity --es target ice_physics
+            sleep 13
+            adb logcat -d -s AURA_QA:I > screenshots/ice-physics.txt
+            grep -q 'ICE_PHYSICS_OK' screenshots/ice-physics.txt
             adb shell am start -W -n com.auraglass.app/.QaEntryActivity --es target folders
             sleep 1
             adb logcat -d -s AURA_QA:I > screenshots/folder-crud.txt

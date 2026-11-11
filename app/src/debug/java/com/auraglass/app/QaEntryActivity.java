@@ -19,6 +19,19 @@ public final class QaEntryActivity extends Activity {
         }
         String target=getIntent()==null?"":getIntent().getStringExtra("target");
         Class<? extends Activity> page=null;
+        if("ice_physics".equals(target)){
+            new Thread(()->{
+                try{
+                    android.util.Log.i("AURA_QA",FrostSelfTest.run());
+                }catch(Throwable e){
+                    android.util.Log.e("AURA_QA","ICE_PHYSICS_EXCEPTION",e);
+                    android.util.Log.i("AURA_QA","ICE_PHYSICS_FAILED");
+                }finally{
+                    runOnUiThread(this::finish);
+                }
+            },"AURA-ice-qa").start();
+            return;
+        }
         if("folders".equals(target)){
             boolean success=false;
             String id=null;
