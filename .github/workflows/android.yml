@@ -201,7 +201,9 @@ jobs:
             mkdir -p widget-qa
             adb install -r app-debug.apk
             adb logcat -c
-            adb shell cmd role add-role-holder android.app.role.HOME com.auraglass.app
+            # Do NOT change the HOME role while Settings consent is in flight:
+            # asynchronous launcher switching can cancel ActivityResult before
+            # the user-consent button is tapped on a newly booted emulator.
             # Exercise Android's ordinary consent flow; no privileged adb grant.
             adb shell am start -W -n com.auraglass.app/.QaEntryActivity --es target widget_bind
             sleep 2
@@ -213,6 +215,11 @@ jobs:
             adb shell dumpsys activity activities > widget-qa/activity-after-consent.txt
             adb exec-out screencap -p > widget-qa/consent-result.png
             if ! grep -q 'WIDGET_BIND_OK' widget-qa/widget-bind.txt; then cat widget-qa/widget-bind-diagnostics.txt; exit 1; fi
+            # Now the system consent Activity has finished, and only now
+            # assign the launcher role. This must not invalidate the bind.
+            adb shell cmd role add-role-holder android.app.role.HOME com.auraglass.app
+            adb shell cmd role get-role-holders android.app.role.HOME > widget-qa/home-role.txt
+            grep -q 'com.auraglass.app' widget-qa/home-role.txt
             adb shell am start -W -n com.auraglass.app/.HomeActivity
             sleep 3
             adb exec-out screencap -p > widget-qa/12-live-widget-on-home.png

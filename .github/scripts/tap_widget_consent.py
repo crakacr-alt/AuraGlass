@@ -13,6 +13,11 @@ if len(sys.argv) != 2:
     raise SystemExit("Usage: tap_widget_consent.py <uiautomator-dump.xml>")
 root = ET.parse(sys.argv[1]).getroot()
 nodes = list(root.iter("node"))
+# Never click generic 'Allow' buttons on unrelated screens. The script runs
+# only on a disposable emulator but must confirm the target dialog explicitly.
+visible_text=" ".join(n.attrib.get("text","") for n in nodes).lower()
+if not ("create widget" in visible_text and "aura glass" in visible_text):
+    raise SystemExit("Not the expected AURA GLASS AppWidget consent dialog")
 positive = {"Create", "Create widget", "Add", "Allow", "OK", "Continue",
             "Создать", "Добавить", "Разрешить", "ОК", "Продолжить"}
 candidates = []
