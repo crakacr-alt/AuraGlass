@@ -29,7 +29,10 @@ public final class IceGlassLayer {
     private final float[] grain=new float[COUNT];
     private final long[] touchedAt=new long[COUNT];
     private final int[] pixels=new int[COUNT];
+    private final int[] dewPixels=new int[COUNT];
     private final Bitmap mask=Bitmap.createBitmap(WIDTH,HEIGHT,Bitmap.Config.ARGB_8888);
+    private final Bitmap dewMask=Bitmap.createBitmap(WIDTH,HEIGHT,Bitmap.Config.ARGB_8888);
+    private boolean hasDewSheen=false;
     private final Random rng=new Random(0xA0F09C3L);
     private final Paint sparklePaint=new Paint(Paint.ANTI_ALIAS_FLAG);
     private long lastUpdate=0;
@@ -209,6 +212,7 @@ public final class IceGlassLayer {
 
     private void rebuild(long now,float sceneStrength){
         float strength=intensity*sceneStrength;
+        boolean warmVisible=false;
         for(int y=0;y<HEIGHT;y++){
             float fy=y/(float)(HEIGHT-1);
             for(int x=0;x<WIDTH;x++){
@@ -248,9 +252,19 @@ public final class IceGlassLayer {
                 int g=Math.max(0,Math.min(255,((rgb>>8)&255)+vary));
                 int b=Math.max(0,Math.min(255,(rgb&255)+vary));
                 pixels[i]=(alpha<<24)|(r<<16)|(g<<8)|b;
+                // Cold glass loses its cloudy frost under a finger, exposing the
+                // dark sky. A very faint translucent liquid-film highlight makes
+                // the trail look like warmed wet glass, not a black painted mark.
+                // The extra layer exists only during cooling, not on idle frames.
+                int dew=(int)(Math.min(.075f,
+                    .063f*warmth*(.8f+.2f*meltDepth[i]))*255f*strength);
+                if(dew>0)warmVisible=true;
+                dewPixels[i]=(dew<<24)|0x00c7edff;
             }
         }
+        hasDewSheen=warmVisible;
         mask.setPixels(pixels,0,WIDTH,0,0,WIDTH,HEIGHT);
+        if(warmVisible)dewMask.setPixels(dewPixels,0,WIDTH,0,0,WIDTH,HEIGHT);
         lastBitmap=now;
         lastStrength=sceneStrength;
     }
@@ -281,6 +295,8 @@ public final class IceGlassLayer {
         }
         bitmapPaint.setAlpha(255);
         canvas.drawBitmap(mask,source,destination,bitmapPaint);
+        if(hasDewSheen)
+            canvas.drawBitmap(dewMask,source,destination,bitmapPaint);
         // Glints on nucleation tips stay small and do not flash or allocate on every frame.
         if(!reducedMotion&&sceneStrength>.2f){
             sparklePaint.setStrokeWidth(Math.max(1,width*.0012f));
