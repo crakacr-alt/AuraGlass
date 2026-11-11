@@ -12,8 +12,15 @@ import android.os.Bundle;
 public final class QaEntryActivity extends Activity {
     private static final int WIDGET_REQUEST=9024;
     private int pendingWidgetId=-1;
+    // UIAutomator can trigger an Android configuration change while the
+    // Settings consent dialog is open. Starting a second bind request cancels
+    // the first. Both the saved instance and process-level guard prevent that.
+    private static int activeBindId=-1;
+    private static long activeBindAt=0;
+    private static final long BIND_EXPIRY_MS=120000;
     @Override protected void onCreate(Bundle state){
         super.onCreate(state);
+        if(state!=null)pendingWidgetId=state.getInt("qa_pending_widget",-1);
         if((getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE)==0){
             finish();return;
         }
@@ -111,10 +118,31 @@ public final class QaEntryActivity extends Activity {
             finish();return;
         }
         if("widget_bind".equals(target)){
+            if(pendingWidgetId>0){
+                android.util.Log.i("AURA_QA",
+                    "WIDGET_BIND_RESUMED id="+pendingWidgetId);
+                // Wait for the already-open Settings consent activity to return.
+                return;
+            }
+            synchronized(QaEntryActivity.class){
+                if(activeBindId>0&&
+                    android.os.SystemClock.elapsedRealtime()-activeBindAt<
+                        BIND_EXPIRY_MS){
+                    android.util.Log.i("AURA_QA",
+                        "WIDGET_BIND_DUPLICATE_PREVENTED id="+activeBindId);
+                    finish();return;
+                }
+            }
             try{
                 android.appwidget.AppWidgetHost appHost=
                     new android.appwidget.AppWidgetHost(this,70901);
                 pendingWidgetId=appHost.allocateAppWidgetId();
+                synchronized(QaEntryActivity.class){
+                    activeBindId=pendingWidgetId;
+                    activeBindAt=android.os.SystemClock.elapsedRealtime();
+                }
+                android.util.Log.i("AURA_QA",
+                    "WIDGET_BIND_STARTED id="+pendingWidgetId);
                 android.appwidget.AppWidgetManager manager=
                     android.appwidget.AppWidgetManager.getInstance(this);
                 android.content.ComponentName provider=
@@ -146,7 +174,20 @@ public final class QaEntryActivity extends Activity {
         if(page!=null)startActivity(new Intent(this,page));
         finish();
     }
+    @Override protected void onSaveInstanceState(Bundle state){
+        if(pendingWidgetId>0)state.putInt("qa_pending_widget",pendingWidgetId);
+        super.onSaveInstanceState(state);
+    }
+    private void clearBindingGuard(){
+        synchronized(QaEntryActivity.class){
+            if(activeBindId==pendingWidgetId){
+                activeBindId=-1;
+                activeBindAt=0;
+            }
+        }
+    }
     private void cleanWidgetBinding(){
+        clearBindingGuard();
         if(pendingWidgetId>0){
             try{new android.appwidget.AppWidgetHost(this,70901)
                 .deleteAppWidgetId(pendingWidgetId);}
@@ -167,6 +208,8 @@ public final class QaEntryActivity extends Activity {
             Config.put(this,"widget_page_"+pendingWidgetId,0f);
             WeatherWidgetProvider.updateAll(this);
             android.util.Log.i("AURA_QA","WIDGET_BIND_OK");
+            clearBindingGuard();
+            pendingWidgetId=-1;
             startActivity(new Intent(this,HomeActivity.class));
         }catch(Exception e){
             android.util.Log.e("AURA_QA","WIDGET_BIND_EXCEPTION",e);
@@ -178,6 +221,8 @@ public final class QaEntryActivity extends Activity {
     @Override protected void onActivityResult(int request,int result,Intent data){
         super.onActivityResult(request,result,data);
         if(request!=WIDGET_REQUEST)return;
+        android.util.Log.i("AURA_QA",
+            "WIDGET_BIND_RESULT result="+result+" pending="+pendingWidgetId);
         if(result==RESULT_OK){
             if(data!=null)
                 pendingWidgetId=data.getIntExtra(

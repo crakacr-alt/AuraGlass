@@ -206,9 +206,13 @@ jobs:
             adb shell am start -W -n com.auraglass.app/.QaEntryActivity --es target widget_bind
             sleep 2
             adb logcat -d -s AURA_QA:I > widget-qa/widget-bind-initial.txt
-            if ! grep -q 'WIDGET_BIND_OK' widget-qa/widget-bind-initial.txt; then adb shell uiautomator dump /sdcard/aura_widget_consent.xml >/dev/null && adb pull /sdcard/aura_widget_consent.xml widget-qa/consent-ui.xml >/dev/null && python3 .github/scripts/tap_widget_consent.py widget-qa/consent-ui.xml && sleep 4; fi
-            adb logcat -d -s AURA_QA:I > widget-qa/widget-bind.txt
-            grep -q 'WIDGET_BIND_OK' widget-qa/widget-bind.txt
+            if ! grep -q 'WIDGET_BIND_OK' widget-qa/widget-bind-initial.txt; then adb shell uiautomator dump /sdcard/aura_widget_consent.xml >/dev/null && adb pull /sdcard/aura_widget_consent.xml widget-qa/consent-ui.xml >/dev/null && python3 .github/scripts/tap_widget_consent.py widget-qa/consent-ui.xml; fi
+            # Await the real Android Activity result, not an arbitrary 4-second delay.
+            for i in 1 2 3 4 5 6 7 8 9 10; do adb logcat -d -s AURA_QA:I > widget-qa/widget-bind.txt; if grep -q 'WIDGET_BIND_OK' widget-qa/widget-bind.txt; then break; fi; sleep 2; done
+            adb logcat -d -v threadtime -s AURA_QA:V AndroidRuntime:E > widget-qa/widget-bind-diagnostics.txt
+            adb shell dumpsys activity activities > widget-qa/activity-after-consent.txt
+            adb exec-out screencap -p > widget-qa/consent-result.png
+            if ! grep -q 'WIDGET_BIND_OK' widget-qa/widget-bind.txt; then cat widget-qa/widget-bind-diagnostics.txt; exit 1; fi
             adb shell am start -W -n com.auraglass.app/.HomeActivity
             sleep 3
             adb exec-out screencap -p > widget-qa/12-live-widget-on-home.png
