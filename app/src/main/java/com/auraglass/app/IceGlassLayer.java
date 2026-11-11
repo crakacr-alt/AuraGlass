@@ -25,6 +25,9 @@ public final class IceGlassLayer {
     private final float[] heat=new float[COUNT];
     private final float[] heatNext=new float[COUNT];
     private final float[] crystal=new float[COUNT];
+    // One-time subpixel coverage filter makes diagonal dendrites continuous
+    // instead of leaving pixel-spaced gaps when the mask is enlarged.
+    private final float[] crystalCoverage=new float[COUNT];
     private final float[] meltDepth=new float[COUNT];
     private final float[] grain=new float[COUNT];
     private final long[] touchedAt=new long[COUNT];
@@ -49,6 +52,7 @@ public final class IceGlassLayer {
 
     public IceGlassLayer(){
         buildCrystals();
+        prepareCrystalCoverage();
         for(int y=0;y<HEIGHT;y++){
             for(int x=0;x<WIDTH;x++){
                 int i=y*WIDTH+x;
@@ -126,6 +130,23 @@ public final class IceGlassLayer {
                 else{x=lane*(WIDTH-1);y=HEIGHT-2;theta=-(float)Math.PI/2;}
                 theta+=(rng.nextFloat()-.5f)*.68f;
                 growBranch(x,y,theta,1.6f+rng.nextFloat()*.7f,21+rng.nextInt(17),0);
+            }
+        }
+    }
+
+    private void prepareCrystalCoverage(){
+        // Static anti-aliasing: build once. Touch/refreeze changes only opacity.
+        // Along diagonals, 5-sample weighted coverage connects fine fern needles
+        // without thickening them into opaque white stripes.
+        for(int y=0;y<HEIGHT;y++){
+            int row=y*WIDTH;
+            for(int x=0;x<WIDTH;x++){
+                int i=row+x;
+                float center=crystal[i];
+                float horizontal=crystal[x>0?i-1:i]+crystal[x<WIDTH-1?i+1:i];
+                float vertical=crystal[y>0?i-WIDTH:i]+crystal[y<HEIGHT-1?i+WIDTH:i];
+                crystalCoverage[i]=Math.min(1f,center*.62f+
+                    horizontal*.095f+vertical*.095f);
             }
         }
     }
@@ -222,7 +243,8 @@ public final class IceGlassLayer {
                     Math.min(fy,1-fy)*2.9f));
                 edge=edge*edge;
                 float baseMist=.075f+edge*.13f;
-                float dendrite=crystal[i]*(.50f+.20f*edge);
+                float vein=crystalCoverage[i];
+                float dendrite=(crystal[i]*.65f+vein*.35f)*(.50f+.20f*edge);
                 float age=touchedAt[i]==0?1000:(now-touchedAt[i])/(1000f*recovery);
                 // Recondensation after 1.3 s, soft droplets followed by crystallization at 3–7 s.
                 float moisture=fade(1.25f,3.2f,age);
@@ -236,8 +258,19 @@ public final class IceGlassLayer {
                 // A thin wet haze stays visible while the frozen lattice melts.
                 float mist=baseMist*(.50f+.50f*moisture)*(1f-.15f*warmth);
                 float ice=dendrite*(.05f+.95f*frozen)*(1f-.80f*warmth);
-                float sparkle=(grain[i]>.982f?crystal[i]*.12f*frozen:0)*(1f-warmth);
-                float opacity=(mist+ice+sparkle)*strength;
+                // Microfacet lighting is based on the local slope of the
+                // smoothed frost ridge. It stays attached to each crystal
+                // through melting and regrowth; no artificial random flashing.
+                float leftVein=crystalCoverage[x>0?i-1:i];
+                float rightVein=crystalCoverage[x<WIDTH-1?i+1:i];
+                float topVein=crystalCoverage[y>0?i-WIDTH:i];
+                float bottomVein=crystalCoverage[y<HEIGHT-1?i+WIDTH:i];
+                float slope=(leftVein-rightVein)*.76f+
+                    (topVein-bottomVein)*.49f;
+                float facet=Math.max(0,Math.min(.12f,slope*.19f));
+                float sparkle=(grain[i]>.982f?vein*.12f*frozen:0)*(1f-warmth);
+                float crystalLight=facet*frozen*(1f-.85f*warmth);
+                float opacity=(mist+ice+sparkle+crystalLight)*strength;
                 // Soft contact-pressure falloff: no hard-edged black marker stroke.
                 if(age<1.3f){
                     float warmOpacity=(1f-fade(.12f,1.3f,age))*meltDepth[i];
@@ -246,7 +279,8 @@ public final class IceGlassLayer {
                 opacity=Math.max(0,Math.min(.55f,opacity));
                 int alpha=(int)(opacity*255);
                 // Cooler crystal highlights; subtle translucent condensation grains.
-                int rgb=crystal[i]>.42f?0xffe5f9ff:0xffb8d6e7;
+                int rgb=vein>.31f||crystalLight>.03f?
+                    0xffe5f9ff:0xffb8d6e7;
                 int vary=(int)((grain[i]-.5f)*12);
                 int r=Math.max(0,Math.min(255,((rgb>>16)&255)+vary));
                 int g=Math.max(0,Math.min(255,((rgb>>8)&255)+vary));
