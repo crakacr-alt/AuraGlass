@@ -174,8 +174,37 @@ public final class QaEntryActivity extends Activity {
         if(page!=null)startActivity(new Intent(this,page));
         finish();
     }
+    @Override protected void onStart(){
+        super.onStart();
+        if(pendingWidgetId>0)
+            android.util.Log.i("AURA_QA","WIDGET_ACTIVITY_ON_START pending="+pendingWidgetId);
+    }
+    @Override protected void onResume(){
+        super.onResume();
+        if(pendingWidgetId>0)
+            android.util.Log.i("AURA_QA","WIDGET_ACTIVITY_ON_RESUME pending="+pendingWidgetId);
+    }
+    @Override protected void onPause(){
+        if(pendingWidgetId>0)
+            android.util.Log.i("AURA_QA","WIDGET_ACTIVITY_ON_PAUSE pending="+pendingWidgetId);
+        super.onPause();
+    }
+    @Override protected void onStop(){
+        if(pendingWidgetId>0)
+            android.util.Log.i("AURA_QA","WIDGET_ACTIVITY_ON_STOP pending="+pendingWidgetId);
+        super.onStop();
+    }
+    @Override protected void onDestroy(){
+        if(pendingWidgetId>0)
+            android.util.Log.i("AURA_QA","WIDGET_ACTIVITY_ON_DESTROY pending="+pendingWidgetId+
+                " changingConfig="+isChangingConfigurations()+" finishing="+isFinishing());
+        super.onDestroy();
+    }
     @Override protected void onSaveInstanceState(Bundle state){
-        if(pendingWidgetId>0)state.putInt("qa_pending_widget",pendingWidgetId);
+        if(pendingWidgetId>0){
+            android.util.Log.i("AURA_QA","WIDGET_ACTIVITY_SAVE_STATE pending="+pendingWidgetId);
+            state.putInt("qa_pending_widget",pendingWidgetId);
+        }
         super.onSaveInstanceState(state);
     }
     private void clearBindingGuard(){
