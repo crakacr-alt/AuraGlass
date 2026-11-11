@@ -9,12 +9,17 @@ import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.RadialGradient;
 import android.graphics.Shader;
+import android.util.SparseArray;
 import java.util.Calendar;
 import java.util.Random;
 
 /** Shared deterministic scene renderer: wallpaper and in-app preview use identical weather/light rules. */
 public final class AtmosphereRenderer {
     private final Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Path sunRayPath=new Path();
+    private final Path ridgePath=new Path();
+    private final SparseArray<Shader> glowShaders=new SparseArray<>();
+    private final Paint glowPaint=new Paint(Paint.ANTI_ALIAS_FLAG);
     // Cached aura curtains: expensive shader objects are rebuilt only on resize,
     // never twenty times on every 120 Hz frame.
     private final Path auroraCurtainPath=new Path();
@@ -203,13 +208,18 @@ public final class AtmosphereRenderer {
             float sunY=h*(.34f-.22f*daylight);
             glow(c,sunX,sunY,w*.58f,alpha(Color.rgb(255,231,187),(int)(93*daylight)));
             disk(c,sunX,sunY,Math.max(6,w*.045f),alpha(Color.WHITE,(int)(190*daylight)));
+            p.setColor(alpha(Color.rgb(255,230,194),(int)(daylight*14)));
             for(int i=0;i<8;i++){
                 double a=i*Math.PI/4+.12;
                 float len=w*.65f;
-                Path ray=new Path();ray.moveTo(sunX,sunY);
-                ray.lineTo(sunX+(float)Math.cos(a-.055)*len,sunY+(float)Math.sin(a-.055)*len);
-                ray.lineTo(sunX+(float)Math.cos(a+.055)*len,sunY+(float)Math.sin(a+.055)*len);
-                ray.close();p.setColor(alpha(Color.rgb(255,230,194),(int)(daylight*14)));c.drawPath(ray,p);
+                sunRayPath.rewind();
+                sunRayPath.moveTo(sunX,sunY);
+                sunRayPath.lineTo(sunX+(float)Math.cos(a-.055)*len,
+                    sunY+(float)Math.sin(a-.055)*len);
+                sunRayPath.lineTo(sunX+(float)Math.cos(a+.055)*len,
+                    sunY+(float)Math.sin(a+.055)*len);
+                sunRayPath.close();
+                c.drawPath(sunRayPath,p);
             }
         }
         if(daylight<.9f){
@@ -221,7 +231,10 @@ public final class AtmosphereRenderer {
             float moonX=w*.72f,moonY=h*.18f;
             glow(c,moonX,moonY,w*.28f,alpha(0xffc7d8ff,(int)(49*night)));
             moonPhase.draw(c,moonX,moonY,Math.max(6,w*.045f),night,System.currentTimeMillis());
-            if(aurora&&(ice||"clear".equals(weather)||"clear".equals(before))&&(hr>=20||hr<=6)){
+            // Use solar illumination in auto mode: an early winter sunset
+            // must not hide the aurora until a fixed 20:00 clock threshold.
+            if(aurora&&(ice||"clear".equals(weather)||"clear".equals(before))&&
+                night>.16f&&("auto".equals(period)||hr>=20||hr<=6)){
                 float clearBlend=("clear".equals(weather)?mix:0f)+("clear".equals(before)?1f-mix:0f);
                 c.save();
                 c.translate(-parallaxX*w*.024f,-parallaxY*h*.014f);
@@ -247,8 +260,26 @@ public final class AtmosphereRenderer {
     }
     private void disk(Canvas c,float x,float y,float r,int color){p.setShader(null);p.setColor(color);c.drawCircle(x,y,r,p);}
     private void glow(Canvas c,float x,float y,float radius,int color){
-        p.setShader(new RadialGradient(x,y,radius,color,alpha(color,0),Shader.TileMode.CLAMP));
-        c.drawCircle(x,y,radius,p);p.setShader(null);
+        if(radius<=.5f||Color.alpha(color)==0)return;
+        // A few hues repeat every frame (sun, moon, fog, horizon).
+        // Cache halo shaders in local unit coordinates; Canvas transforms
+        // position/radius without allocating a new shader at 120 FPS.
+        int rgb=color&0x00ffffff;
+        Shader halo=glowShaders.get(rgb);
+        if(halo==null){
+            halo=new RadialGradient(0f,0f,1f,
+                new int[]{0xff000000|rgb,rgb},null,Shader.TileMode.CLAMP);
+            glowShaders.put(rgb,halo);
+        }
+        c.save();
+        c.translate(x,y);
+        c.scale(radius,radius);
+        glowPaint.setShader(halo);
+        glowPaint.setAlpha(Color.alpha(color));
+        c.drawCircle(0f,0f,1f,glowPaint);
+        glowPaint.setShader(null);
+        glowPaint.setAlpha(255);
+        c.restore();
     }
     private void ensureAuroraShaders(float height){
         int measured=Math.max(1,Math.round(height));
@@ -302,18 +333,19 @@ public final class AtmosphereRenderer {
     private void drawRidge(Canvas c,float w,float h,float t,float day,float eve){
         for(int layer=0;layer<3;layer++){
             float base=h*(.78f+layer*.09f);
-            Path path=new Path();path.moveTo(0,h);
-            path.lineTo(0,base);
+            ridgePath.rewind();
+            ridgePath.moveTo(0,h);
+            ridgePath.lineTo(0,base);
             for(int x=0;x<=24;x++){
                 float px=w*x/24f;
                 float py=base+(float)Math.sin(x*.46f+layer*2.1f+t*.007f)*h*.025f
                     +(float)Math.sin(x*.91f+layer*.7f)*h*.015f;
-                path.lineTo(px,py);
+                ridgePath.lineTo(px,py);
             }
-            path.lineTo(w,h);path.close();
+            ridgePath.lineTo(w,h);ridgePath.close();
             int near=blend(0xff232844,0xff536f83,day*.78f);
             p.setColor(alpha(near,layer==0?84:layer==1?145:205));
-            c.drawPath(path,p);
+            c.drawPath(ridgePath,p);
         }
         glow(c,w*.6f,h*.95f,w*.6f,alpha(0xffffd7c3,(int)(eve*37)));
     }
