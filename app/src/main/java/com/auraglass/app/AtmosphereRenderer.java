@@ -23,6 +23,10 @@ public final class AtmosphereRenderer {
     private final IceGlassLayer iceGlass=new IceGlassLayer();
     private final CelestialLayer celestial=new CelestialLayer();
     private final MoonPhase moonPhase=new MoonPhase();
+    private final SolarLighting solarLighting=new SolarLighting();
+    private final float[] solarLevels=new float[2];
+    private float animatedDaylight=Float.NaN,animatedTwilight=Float.NaN;
+    private java.util.TimeZone cityTimezone=java.util.TimeZone.getDefault();
     private final float[] rx=new float[125],ry=new float[125],rv=new float[125],rs=new float[125];
     private String mode="auto", period="auto";
     private float intensity=.58f,speed=.65f;
@@ -62,6 +66,12 @@ public final class AtmosphereRenderer {
         parallaxEnabled=Config.bool(ctx,"parallax",false)&&!reduceMotion;
         parallaxAmount=Config.number(ctx,"parallax_strength",.35f);
         WeatherRepository.Snapshot climate=WeatherRepository.read(ctx);
+        solarLighting.load(climate.solarRises,climate.solarSets);
+        String zone=climate.solarTimezone;
+        if(zone!=null&&!zone.isEmpty()&&
+            java.util.Arrays.asList(java.util.TimeZone.getAvailableIDs()).contains(zone))
+            cityTimezone=java.util.TimeZone.getTimeZone(zone);
+        else cityTimezone=java.util.TimeZone.getDefault();
         wind=Math.max(-1f,Math.min(1f,climate.wind/28f));
         boolean manual=!"auto".equals(mode);
         climateBoost=ClimateGlass.frostBoost(climate,manual);
@@ -115,7 +125,7 @@ public final class AtmosphereRenderer {
         if("day".equals(period))return 13.5f;
         if("evening".equals(period))return 18.3f;
         if("night".equals(period))return 1.5f;
-        Calendar cal=Calendar.getInstance();
+        Calendar cal=Calendar.getInstance(cityTimezone);
         return cal.get(Calendar.HOUR_OF_DAY)+cal.get(Calendar.MINUTE)/60f;
     }
     public void draw(Canvas c,int width,int height,long ms){
@@ -134,8 +144,22 @@ public final class AtmosphereRenderer {
         float hourDifference=((targetHour-animatedHour+36f)%24f)-12f;
         animatedHour=(animatedHour+hourDifference*(1f-(float)Math.exp(-dt/1800f))+24f)%24f;
         float hr=animatedHour;
-        float daylight=smooth(5.2f,9f,hr)*(1f-smooth(17.3f,21.6f,hr));
-        float twilight=smooth(15.5f,18.1f,hr)*(1-smooth(20.1f,22.0f,hr));
+        float targetDay=smooth(5.2f,9f,hr)*(1f-smooth(17.3f,21.6f,hr));
+        float targetTwilight=smooth(15.5f,18.1f,hr)*(1-smooth(20.1f,22.0f,hr));
+        // Manual morning/day/evening/night presets deliberately override
+        // actual solar time. In auto mode the chosen city's forecast controls
+        // dawn and dusk, even when the phone is in another timezone.
+        if("auto".equals(period)&&solarLighting.sample(System.currentTimeMillis(),solarLevels)){
+            targetDay=solarLevels[0];
+            targetTwilight=solarLevels[1];
+        }
+        if(Float.isNaN(animatedDaylight))animatedDaylight=targetDay;
+        if(Float.isNaN(animatedTwilight))animatedTwilight=targetTwilight;
+        float lightEase=1-(float)Math.exp(-dt/1800f);
+        animatedDaylight+=(targetDay-animatedDaylight)*lightEase;
+        animatedTwilight+=(targetTwilight-animatedTwilight)*lightEase;
+        float daylight=animatedDaylight;
+        float twilight=animatedTwilight;
         String weather=actualWeather();
         float mix=previousWeather==null?1:smooth(0,1,(ms-weatherChangeAt)/3400f);
         String before=previousWeather==null?weather:previousWeather;
