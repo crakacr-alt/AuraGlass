@@ -7,6 +7,7 @@ import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.RadialGradient;
 import android.graphics.Shader;
+import android.util.SparseArray;
 import java.util.Random;
 
 /**
@@ -19,6 +20,10 @@ public final class CelestialLayer {
     private final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint trail=new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Path cometPath=new Path();
+    // The same few halo colors recur thousands of times per minute.
+    // Normalized 1-pixel shaders are scaled in Canvas space instead of
+    // allocating new RadialGradient objects for every 120 Hz frame.
+    private final SparseArray<Shader> glowShaders=new SparseArray<>();
 
     public CelestialLayer(){
         Random rng=new Random(0x61A72C0L);
@@ -44,10 +49,22 @@ public final class CelestialLayer {
     }
     private void glow(Canvas canvas,float x,float y,float size,int rgb,float alpha){
         if(size<1||alpha<=.002f)return;
-        int color=tint(rgb,alpha);
-        paint.setShader(new RadialGradient(x,y,size,color,tint(rgb,0),Shader.TileMode.CLAMP));
-        canvas.drawCircle(x,y,size,paint);
+        int color=rgb&0x00ffffff;
+        Shader halo=glowShaders.get(color);
+        if(halo==null){
+            halo=new RadialGradient(0,0,1f,
+                new int[]{0xff000000|color,color},null,Shader.TileMode.CLAMP);
+            glowShaders.put(color,halo);
+        }
+        canvas.save();
+        canvas.translate(x,y);
+        canvas.scale(size,size);
+        paint.setShader(halo);
+        paint.setAlpha((int)(clamp(alpha)*255));
+        canvas.drawCircle(0,0,1f,paint);
         paint.setShader(null);
+        paint.setAlpha(255);
+        canvas.restore();
     }
 
     public void draw(Canvas c,float width,float height,float seconds,float night,
