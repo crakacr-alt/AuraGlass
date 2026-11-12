@@ -155,8 +155,12 @@ jobs:
             adb shell am start -W -n com.auraglass.app/.MainActivity
             sleep 2
             adb exec-out screencap -p > screenshots/04-editor.png
-            adb shell am start -W -n com.auraglass.app/.IceShowcaseActivity
+            # Launch the real full-screen ICE activity from QA and verify that
+            # opening it does not overwrite selected wallpaper/time preferences.
+            adb shell am start -W -n com.auraglass.app/.QaEntryActivity --es target ice_preview_settings
             sleep 3
+            adb logcat -d -s AURA_QA:I > screenshots/ice-preview-settings.txt
+            grep -q 'ICE_PREVIEW_SETTINGS_OK' screenshots/ice-preview-settings.txt
             adb exec-out screencap -p > screenshots/06-ice-before.png
             adb shell input swipe 270 1000 810 1420 900
             sleep 1

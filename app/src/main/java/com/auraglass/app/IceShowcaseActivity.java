@@ -26,9 +26,8 @@ public final class IceShowcaseActivity extends Activity {
     @Override public void onCreate(Bundle saved){
         super.onCreate(saved);
         RefreshRateSupport.applyToActivity(this);
-        // Explicit demo scene, never installs or replaces the user's wallpaper.
-        Config.put(this,"weather_mode","ice");
-        Config.put(this,"time_mode","night");
+        // The demo overrides only its own renderer, never the wallpaper settings.
+        // Leaving this screen must preserve the selected weather and time modes.
         getWindow().setStatusBarColor(Color.TRANSPARENT);
         getWindow().setNavigationBarColor(Color.TRANSPARENT);
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,
@@ -48,7 +47,10 @@ public final class IceShowcaseActivity extends Activity {
         private final RenderBudget budget=new RenderBudget(IceShowcaseActivity.this);
         private boolean active;
         private final float density=getResources().getDisplayMetrics().density;
-        IceScene(){super(IceShowcaseActivity.this);renderer.reload(IceShowcaseActivity.this);}
+        IceScene(){
+            super(IceShowcaseActivity.this);
+            renderer.setPreviewPreset(IceShowcaseActivity.this,"ice","night");
+        }
         @Override protected void onDraw(Canvas c){
             super.onDraw(c);
             long start=SystemClock.uptimeMillis();
