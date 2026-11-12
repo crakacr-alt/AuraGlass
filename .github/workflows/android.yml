@@ -100,6 +100,12 @@ jobs:
             sleep 1
             adb logcat -d -s AURA_QA:I > screenshots/solar-cycle.txt
             grep -q 'SOLAR_CYCLE_OK' screenshots/solar-cycle.txt
+            # Aurora is generated as a continuous optical field, not tiled
+            # polygon strips; verify spatial and temporal continuity.
+            adb shell am start -W -n com.auraglass.app/.QaEntryActivity --es target aurora_field
+            sleep 1
+            adb logcat -d -s AURA_QA:I > screenshots/aurora-field.txt
+            grep -q 'AURORA_FIELD_OK' screenshots/aurora-field.txt
             # Quantitative frost QA: real melt/re-freeze on the Android renderer,
             # rather than trusting a large screenshot's file size.
             adb logcat -c
