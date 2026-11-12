@@ -56,23 +56,33 @@ public final class Activation {
     }
 
     public static void requestHome(Activity activity) {
+        if (isHomeActive(activity)) {
+            Toast.makeText(activity, "AURA уже выбрана домашним экраном", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        // OEM role pickers sometimes return to onboarding without changing HOME.
+        // Keep a visible settings fallback when the user comes back.
         if (Build.VERSION.SDK_INT >= 29) {
             RoleManager roles = (RoleManager) activity.getSystemService(Context.ROLE_SERVICE);
             if (roles != null && roles.isRoleAvailable(RoleManager.ROLE_HOME)) {
-                if (roles.isRoleHeld(RoleManager.ROLE_HOME)) {
-                    Toast.makeText(activity, "AURA уже выбрана домашним экраном", Toast.LENGTH_SHORT).show();
-                    return;
-                }
-                if (launch(activity, roles.createRequestRoleIntent(RoleManager.ROLE_HOME))) {
-                    Toast.makeText(activity, "Если окно выбора не появилось, откройте настройки главного экрана", Toast.LENGTH_LONG).show();
-                    return;
+                try {
+                    if (launch(activity, roles.createRequestRoleIntent(RoleManager.ROLE_HOME))) {
+                        activity.getWindow().getDecorView().postDelayed(() -> {
+                            if (!activity.isFinishing() && !activity.isDestroyed() &&
+                                    !isHomeActive(activity)) {
+                                Toast.makeText(activity,
+                                    "Если AURA не появилась в выборе, откройте системный выбор лаунчера",
+                                    Toast.LENGTH_LONG).show();
+                            }
+                        }, 1200);
+                        return;
+                    }
+                } catch (RuntimeException error) {
+                    android.util.Log.w("AuraActivation", "HOME role picker failed", error);
                 }
             }
         }
-        if (!launch(activity, new Intent(Settings.ACTION_HOME_SETTINGS))) {
-            if (!launch(activity, new Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS)))
-                explain(activity, "Откройте Настройки → Приложения → Приложения по умолчанию → Главный экран");
-        }
+        chooseSystemHome(activity);
     }
 
     public static void requestWallpaper(Activity activity) {
