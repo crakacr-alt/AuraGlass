@@ -32,6 +32,18 @@ public final class AtmosphereRenderer {
     private float cachedClockHour=12f;
     private final float[] rx=new float[125],ry=new float[125],rv=new float[125],rs=new float[125];
     private String mode="auto", period="auto";
+    // A preview owns its mode without ever writing global SharedPreferences.
+    private String previewWeather=null,previewTime=null;
+    public void setPreviewPreset(Context context,String weather,String time){
+        previewWeather=weather;
+        previewTime=time;
+        reload(context);
+        previousWeather=null;
+        weatherChangeAt=0;
+        animatedHour=Float.NaN;
+        animatedDaylight=Float.NaN;
+        animatedTwilight=Float.NaN;
+    }
     private float intensity=.58f,speed=.65f;
     private boolean aurora=true,stars=true,lightning=true,reduceMotion=false;
     private boolean galaxy=true,comets=true,iceEnabled=true,snowEnabled=true,glassTouch=true;
@@ -53,8 +65,8 @@ public final class AtmosphereRenderer {
     }
     public void reload(Context ctx){
         String old=actualWeather();
-        mode=Config.str(ctx,"weather_mode","auto");
-        period=Config.str(ctx,"time_mode","auto");
+        mode=previewWeather!=null?previewWeather:Config.str(ctx,"weather_mode","auto");
+        period=previewTime!=null?previewTime:Config.str(ctx,"time_mode","auto");
         intensity=Config.number(ctx,"intensity",.58f);
         speed=Config.number(ctx,"speed",.65f);
         aurora=Config.bool(ctx,"aurora",true);
