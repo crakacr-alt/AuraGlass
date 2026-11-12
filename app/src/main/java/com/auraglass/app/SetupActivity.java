@@ -170,6 +170,10 @@ public final class SetupActivity extends Activity {
         launcherStatus = title("Проверяем…", 13, true);
         launcher.addView(launcherStatus);
         addButton(launcher, "Сделать AURA главным экраном", () -> Activation.requestHome(this));
+        // One UI may dismiss or suppress the role picker. Keep an explicit
+        // OEM-independent route visible instead of relying on a transient toast.
+        addButton(launcher, "Открыть системный выбор лаунчера", () ->
+                Activation.chooseSystemHome(this));
         addButton(launcher, "Посмотреть рабочий стол", () ->
                 startActivity(new Intent(this, HomeActivity.class)));
         addButton(launcher, "Вернуть One UI Home", () -> Activation.chooseSystemHome(this));
