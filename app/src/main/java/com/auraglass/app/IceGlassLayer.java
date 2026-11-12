@@ -166,7 +166,9 @@ public final class IceGlassLayer {
         float px=nx*WIDTH,py=ny*HEIGHT;
         if(previousX>=0){
             float distance=(float)Math.hypot(px-previousX,py-previousY);
-            int steps=Math.min(45,Math.max(1,(int)(distance/1.8f)));
+            // Preserve coverage even for fast long swipes across the display.
+            // The old 45-stamp cap could leave visible gaps on tall screens.
+            int steps=Math.min(320,Math.max(1,(int)Math.ceil(distance/1.8f)));
             for(int s=0;s<steps;s++){
                 float f=s/(float)steps;
                 melt(previousX+(px-previousX)*f,previousY+(py-previousY)*f,width,height,now);
@@ -276,10 +278,17 @@ public final class IceGlassLayer {
                 float nz=1f/(float)Math.sqrt(1f+nx*nx+ny*ny);
                 nx*=nz; ny*=nz;
                 float ndoth=Math.max(0f,nx*.33f+ny*(-.24f)+nz*.91f);
-                float specular=(float)Math.pow(ndoth,36f);
+                // x^36 using multiplies avoids 120k Math.pow calls per mask rebuild.
+                float s2=ndoth*ndoth;
+                float s4=s2*s2;
+                float s8=s4*s4;
+                float s16=s8*s8;
+                float specular=s16*s16*s4;
                 // Schlick Fresnel for air (n=1) to ice (n~1.31).
-                float f0=(.31f/2.31f)*(.31f/2.31f);
-                float fresnel=f0+(1f-f0)*(float)Math.pow(1f-Math.max(0f,nz),5f);
+                float f0=.018009f;
+                float oneMinusCos=1f-Math.max(0f,nz);
+                float om2=oneMinusCos*oneMinusCos;
+                float fresnel=f0+(1f-f0)*om2*om2*oneMinusCos;
                 float facet=Math.min(.16f,(specular*.10f+fresnel*.18f)*vein);
                 float sparkle=(grain[i]>.982f?vein*.12f*frozen:0)*(1f-warmth);
                 float crystalLight=facet*frozen*(1f-.85f*warmth);
