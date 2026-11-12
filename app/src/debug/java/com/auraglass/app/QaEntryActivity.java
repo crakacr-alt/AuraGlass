@@ -34,6 +34,19 @@ public final class QaEntryActivity extends Activity {
             }
             finish();return;
         }
+        if("ice_preview_settings".equals(target)){
+            final String beforeWeather=Config.str(this,"weather_mode","auto");
+            final String beforeTime=Config.str(this,"time_mode","auto");
+            startActivity(new Intent(this,IceShowcaseActivity.class));
+            new android.os.Handler(getMainLooper()).postDelayed(()->{
+                boolean preserved=beforeWeather.equals(Config.str(this,"weather_mode","auto"))&&
+                    beforeTime.equals(Config.str(this,"time_mode","auto"));
+                android.util.Log.i("AURA_QA",preserved?
+                    "ICE_PREVIEW_SETTINGS_OK":"ICE_PREVIEW_SETTINGS_FAILED");
+                finish();
+            },1200);
+            return;
+        }
         if("solar_cycle".equals(target)){
             try{android.util.Log.i("AURA_QA",SolarSelfTest.run());}
             catch(Throwable e){
