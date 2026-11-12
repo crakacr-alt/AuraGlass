@@ -216,7 +216,9 @@ public final class IceGlassLayer {
         // while its visual alpha mask stays unchanged.
         if(dt<REBUILD_MS)return;
         lastUpdate=now;
-        float diffusion=.10f*(dt/60f);
+        // Explicit 2-D heat equation: alpha*dt/dx^2 must stay <= 1/4
+        // for the five-point stencil to remain stable and non-oscillatory.
+        float diffusion=Math.min(.24f,.10f*(dt/60f));
         float cooling=(float)Math.exp(-dt/(1500f*recovery));
         for(int y=0;y<HEIGHT;y++){
             int row=y*WIDTH;
@@ -225,7 +227,8 @@ public final class IceGlassLayer {
                 float v=heat[i];
                 float left=heat[x>0?i-1:i],right=heat[x<WIDTH-1?i+1:i];
                 float up=heat[y>0?i-WIDTH:i],down=heat[y<HEIGHT-1?i+WIDTH:i];
-                heatNext[i]=Math.max(0,(v+diffusion*(left+right+up+down-4*v))*cooling);
+                heatNext[i]=Math.max(0,Math.min(1f,
+                    (v+diffusion*(left+right+up+down-4f*v))*cooling));
             }
         }
         System.arraycopy(heatNext,0,heat,0,COUNT);
@@ -265,9 +268,19 @@ public final class IceGlassLayer {
                 float rightVein=crystalCoverage[x<WIDTH-1?i+1:i];
                 float topVein=crystalCoverage[y>0?i-WIDTH:i];
                 float bottomVein=crystalCoverage[y<HEIGHT-1?i+WIDTH:i];
-                float slope=(leftVein-rightVein)*.76f+
-                    (topVein-bottomVein)*.49f;
-                float facet=Math.max(0,Math.min(.12f,slope*.19f));
+                // Height-field normals approximate the local crystal slope.
+                // A normalized half-vector yields view-dependent specular
+                // facets instead of uniformly bright, painted white branches.
+                float nx=(leftVein-rightVein)*.85f;
+                float ny=(topVein-bottomVein)*.85f;
+                float nz=1f/(float)Math.sqrt(1f+nx*nx+ny*ny);
+                nx*=nz; ny*=nz;
+                float ndoth=Math.max(0f,nx*.33f+ny*(-.24f)+nz*.91f);
+                float specular=(float)Math.pow(ndoth,36f);
+                // Schlick Fresnel for air (n=1) to ice (n~1.31).
+                float f0=(.31f/2.31f)*(.31f/2.31f);
+                float fresnel=f0+(1f-f0)*(float)Math.pow(1f-Math.max(0f,nz),5f);
+                float facet=Math.min(.16f,(specular*.10f+fresnel*.18f)*vein);
                 float sparkle=(grain[i]>.982f?vein*.12f*frozen:0)*(1f-warmth);
                 float crystalLight=facet*frozen*(1f-.85f*warmth);
                 float opacity=(mist+ice+sparkle+crystalLight)*strength;
