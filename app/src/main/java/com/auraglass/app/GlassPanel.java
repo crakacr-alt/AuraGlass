@@ -79,6 +79,10 @@ public final class GlassPanel extends FrameLayout {
             }
             invalidate();
         }else if(action==MotionEvent.ACTION_MOVE){
+            // Include coalesced historical points so fast swipes leave no gaps.
+            for(int i=0;i<event.getHistorySize();i++)
+                snowEdge.touch(event.getHistoricalX(i),event.getHistoricalEventTime(i));
+            snowEdge.touch(event.getX(),now);
             pressedX=event.getX();pressedY=event.getY();
             if(ice!=null&&enabled&&strength>.01f){
                 for(int i=0;i<event.getHistorySize();i++){
@@ -90,6 +94,7 @@ public final class GlassPanel extends FrameLayout {
             }
             invalidate();
         }else if(action==MotionEvent.ACTION_UP||action==MotionEvent.ACTION_CANCEL){
+            if(action==MotionEvent.ACTION_UP)snowEdge.touch(event.getX(),now);
             holding=false;pressEndedAt=now;
             if(ice!=null)ice.endStroke();
             invalidate();
