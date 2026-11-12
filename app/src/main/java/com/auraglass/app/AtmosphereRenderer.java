@@ -20,10 +20,7 @@ public final class AtmosphereRenderer {
     private final Path ridgePath=new Path();
     private final SparseArray<Shader> glowShaders=new SparseArray<>();
     private final Paint glowPaint=new Paint(Paint.ANTI_ALIAS_FLAG);
-    // Gradient-lit beams avoid the hard polygon boundaries that made early
-    // aurora previews look like stacked topographic bands.
-    private final LinearGradient[] auroraGradients=new LinearGradient[4];
-    private int auroraGradientHeight=-1;
+    private final AuroraCurtainLayer auroraCurtains=new AuroraCurtainLayer();
     private final IceGlassLayer iceGlass=new IceGlassLayer();
     private final CelestialLayer celestial=new CelestialLayer();
     private final MoonPhase moonPhase=new MoonPhase();
@@ -237,7 +234,7 @@ public final class AtmosphereRenderer {
                 float clearBlend=("clear".equals(weather)?mix:0f)+("clear".equals(before)?1f-mix:0f);
                 c.save();
                 c.translate(-parallaxX*w*.024f,-parallaxY*h*.014f);
-                drawAurora(c,w,h,motion,night*Math.max(clearBlend,icePower));
+                auroraCurtains.draw(c,w,h,motion,night*Math.max(clearBlend,icePower),renderQuality,reduceMotion);
                 c.restore();
             }
             // Smooth, separately phased time-lapse comets are handled by CelestialLayer.
@@ -279,61 +276,6 @@ public final class AtmosphereRenderer {
         glowPaint.setShader(null);
         glowPaint.setAlpha(255);
         c.restore();
-    }
-    private void ensureAuroraShaders(float height){
-        int measured=Math.max(1,Math.round(height));
-        if(auroraGradientHeight==measured)return;
-        auroraGradientHeight=measured;
-        for(int curtain=0;curtain<4;curtain++){
-            int color=curtain%3==0?0xff59f5d1:curtain%3==1?
-                0xff829ff7:0xffc78dff;
-            float base=height*(.055f+curtain*.035f);
-            // A translucent, double-ended fade: no opaque top/bottom edge.
-            auroraGradients[curtain]=new LinearGradient(0,base-height*.14f,
-                0,base+height*.39f,
-                new int[]{alpha(color,0),alpha(color,31),
-                    alpha(color,37),alpha(color,0)},
-                new float[]{0,.29f,.57f,1f},Shader.TileMode.CLAMP);
-        }
-    }
-    private void drawAurora(Canvas c,float w,float h,float t,float night){
-        // Flowing folded curtains, rather than discrete vertical bars. Each
-        // translucent ribbon has continuously varying boundaries and brightness.
-        ensureAuroraShaders(h);
-        int curtains=renderQuality<.58f?2:3;
-        int strips=renderQuality<.58f?36:64;
-        p.setStyle(Paint.Style.FILL);
-        for(int curtain=0;curtain<curtains;curtain++){
-            float phase=curtain*1.37f;
-            float base=h*(.10f+curtain*.052f);
-            float depth=h*(.18f+curtain*.032f);
-            for(int strip=0;strip<strips;strip++){
-                float u0=strip/(float)strips;
-                float u1=(strip+1f)/strips;
-                float x0=w*u0,x1=w*u1;
-                float fold0=(float)Math.sin(u0*8.1f+t*.16f+phase);
-                float fold1=(float)Math.sin(u1*8.1f+t*.16f+phase);
-                float fine0=(float)Math.sin(u0*17.3f-t*.083f+phase);
-                float fine1=(float)Math.sin(u1*17.3f-t*.083f+phase);
-                float top0=base+h*(.032f*fold0+.011f*fine0);
-                float top1=base+h*(.032f*fold1+.011f*fine1);
-                float width0=depth*(.65f+.35f*(float)Math.sin(u0*10f+t*.09f+phase));
-                float width1=depth*(.65f+.35f*(float)Math.sin(u1*10f+t*.09f+phase));
-                float shimmer=.5f+.5f*(float)Math.sin(u0*23f-t*.24f+phase);
-                float foldLight=.55f+.45f*Math.abs(fold0);
-                p.setShader(auroraGradients[curtain]);
-                p.setAlpha((int)(Math.min(1f,night)*(.28f+.42f*shimmer)*foldLight*255));
-                ridgePath.rewind();
-                ridgePath.moveTo(x0,top0);
-                ridgePath.lineTo(x1,top1);
-                ridgePath.lineTo(x1+w*.018f*fold1,top1+width1);
-                ridgePath.lineTo(x0+w*.018f*fold0,top0+width0);
-                ridgePath.close();
-                c.drawPath(ridgePath,p);
-            }
-            p.setShader(null);
-        }
-        p.setAlpha(255);
     }
     private void drawRidge(Canvas c,float w,float h,float t,float day,float eve){
         for(int layer=0;layer<3;layer++){
