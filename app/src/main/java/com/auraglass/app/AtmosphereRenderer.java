@@ -297,35 +297,42 @@ public final class AtmosphereRenderer {
         }
     }
     private void drawAurora(Canvas c,float w,float h,float t,float night){
-        // Hundreds of thin beams instead of twenty filled wave polygons.
-        // Their overlapping vertical gradients produce curtain-like translucence.
-        // No Path/Shader objects are allocated in this hot draw loop.
+        // Flowing folded curtains, rather than discrete vertical bars. Each
+        // translucent ribbon has continuously varying boundaries and brightness.
         ensureAuroraShaders(h);
         int curtains=renderQuality<.58f?2:3;
-        int columns=renderQuality<.58f?18:renderQuality<.84f?31:44;
-        p.setStyle(Paint.Style.STROKE);
-        p.setStrokeCap(Paint.Cap.BUTT);
+        int strips=renderQuality<.58f?36:64;
+        p.setStyle(Paint.Style.FILL);
         for(int curtain=0;curtain<curtains;curtain++){
-            float base=h*(.055f+curtain*.035f);
-            p.setShader(auroraGradients[curtain]);
-            for(int n=0;n<columns;n++){
-                float u=n/(float)Math.max(1,columns-1);
-                float wave=(float)Math.sin(u*7.2f+t*.13f+curtain*.83f);
-                float fold=(float)Math.sin(u*15.3f-t*.071f+curtain*1.1f);
-                float y=base+h*(.027f*wave+.016f*fold);
-                float x=w*(u*1.12f-.06f);
-                float length=h*(.235f+.043f*(.5f+.5f*
-                    (float)Math.sin(u*10.1f+t*.08f+curtain*.7f)));
-                float drift=w*.012f*(float)Math.sin(u*11f+t*.041f+curtain);
-                float shimmer=.72f+.28f*(float)Math.sin(
-                    u*13.5f-t*.17f+curtain*1.4f);
-                p.setStrokeWidth(w*(.022f+.006f*(1f-u)));
-                p.setAlpha(Math.max(0,Math.min(255,(int)(255*night*shimmer))));
-                c.drawLine(x,y,x+drift,y+length,p);
+            float phase=curtain*1.37f;
+            float base=h*(.10f+curtain*.052f);
+            float depth=h*(.18f+curtain*.032f);
+            for(int strip=0;strip<strips;strip++){
+                float u0=strip/(float)strips;
+                float u1=(strip+1f)/strips;
+                float x0=w*u0,x1=w*u1;
+                float fold0=(float)Math.sin(u0*8.1f+t*.16f+phase);
+                float fold1=(float)Math.sin(u1*8.1f+t*.16f+phase);
+                float fine0=(float)Math.sin(u0*17.3f-t*.083f+phase);
+                float fine1=(float)Math.sin(u1*17.3f-t*.083f+phase);
+                float top0=base+h*(.032f*fold0+.011f*fine0);
+                float top1=base+h*(.032f*fold1+.011f*fine1);
+                float width0=depth*(.65f+.35f*(float)Math.sin(u0*10f+t*.09f+phase));
+                float width1=depth*(.65f+.35f*(float)Math.sin(u1*10f+t*.09f+phase));
+                float shimmer=.5f+.5f*(float)Math.sin(u0*23f-t*.24f+phase);
+                float foldLight=.55f+.45f*Math.abs(fold0);
+                p.setShader(auroraGradients[curtain]);
+                p.setAlpha((int)(Math.min(1f,night)*(.28f+.42f*shimmer)*foldLight*255));
+                ridgePath.rewind();
+                ridgePath.moveTo(x0,top0);
+                ridgePath.lineTo(x1,top1);
+                ridgePath.lineTo(x1+w*.018f*fold1,top1+width1);
+                ridgePath.lineTo(x0+w*.018f*fold0,top0+width0);
+                ridgePath.close();
+                c.drawPath(ridgePath,p);
             }
             p.setShader(null);
         }
-        p.setStyle(Paint.Style.FILL);
         p.setAlpha(255);
     }
     private void drawRidge(Canvas c,float w,float h,float t,float day,float eve){
