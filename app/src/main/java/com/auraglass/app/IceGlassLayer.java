@@ -166,7 +166,9 @@ public final class IceGlassLayer {
         float px=nx*WIDTH,py=ny*HEIGHT;
         if(previousX>=0){
             float distance=(float)Math.hypot(px-previousX,py-previousY);
-            int steps=Math.min(45,Math.max(1,(int)(distance/1.8f)));
+            // Preserve coverage even for fast long swipes across the display.
+            // The old 45-stamp cap could leave visible gaps on tall screens.
+            int steps=Math.min(320,Math.max(1,(int)Math.ceil(distance/1.8f)));
             for(int s=0;s<steps;s++){
                 float f=s/(float)steps;
                 melt(previousX+(px-previousX)*f,previousY+(py-previousY)*f,width,height,now);
@@ -216,7 +218,9 @@ public final class IceGlassLayer {
         // while its visual alpha mask stays unchanged.
         if(dt<REBUILD_MS)return;
         lastUpdate=now;
-        float diffusion=.10f*(dt/60f);
+        // Explicit 2-D heat equation: alpha*dt/dx^2 must stay <= 1/4
+        // for the five-point stencil to remain stable and non-oscillatory.
+        float diffusion=Math.min(.24f,.10f*(dt/60f));
         float cooling=(float)Math.exp(-dt/(1500f*recovery));
         for(int y=0;y<HEIGHT;y++){
             int row=y*WIDTH;
@@ -225,7 +229,8 @@ public final class IceGlassLayer {
                 float v=heat[i];
                 float left=heat[x>0?i-1:i],right=heat[x<WIDTH-1?i+1:i];
                 float up=heat[y>0?i-WIDTH:i],down=heat[y<HEIGHT-1?i+WIDTH:i];
-                heatNext[i]=Math.max(0,(v+diffusion*(left+right+up+down-4*v))*cooling);
+                heatNext[i]=Math.max(0,Math.min(1f,
+                    (v+diffusion*(left+right+up+down-4f*v))*cooling));
             }
         }
         System.arraycopy(heatNext,0,heat,0,COUNT);
@@ -265,12 +270,41 @@ public final class IceGlassLayer {
                 float rightVein=crystalCoverage[x<WIDTH-1?i+1:i];
                 float topVein=crystalCoverage[y>0?i-WIDTH:i];
                 float bottomVein=crystalCoverage[y<HEIGHT-1?i+WIDTH:i];
-                float slope=(leftVein-rightVein)*.76f+
-                    (topVein-bottomVein)*.49f;
-                float facet=Math.max(0,Math.min(.12f,slope*.19f));
+                // Height-field normals approximate the local crystal slope.
+                // A normalized half-vector yields view-dependent specular
+                // facets instead of uniformly bright, painted white branches.
+                float nx=(leftVein-rightVein)*.85f;
+                float ny=(topVein-bottomVein)*.85f;
+                float nz=1f/(float)Math.sqrt(1f+nx*nx+ny*ny);
+                nx*=nz; ny*=nz;
+                float ndoth=Math.max(0f,nx*.33f+ny*(-.24f)+nz*.91f);
+                // x^36 using multiplies avoids 120k Math.pow calls per mask rebuild.
+                float s2=ndoth*ndoth;
+                float s4=s2*s2;
+                float s8=s4*s4;
+                float s16=s8*s8;
+                float specular=s16*s16*s4;
+                // Schlick Fresnel for air (n=1) to ice (n~1.31).
+                float f0=.018009f;
+                float oneMinusCos=1f-Math.max(0f,nz);
+                float om2=oneMinusCos*oneMinusCos;
+                float fresnel=f0+(1f-f0)*om2*om2*oneMinusCos;
+                float facet=Math.min(.16f,(specular*.10f+fresnel*.18f)*vein);
                 float sparkle=(grain[i]>.982f?vein*.12f*frozen:0)*(1f-warmth);
                 float crystalLight=facet*frozen*(1f-.85f*warmth);
-                float opacity=(mist+ice+sparkle+crystalLight)*strength;
+                // The liquid boundary behaves like a curved meniscus: its
+                // slope produces a restrained highlight around a warm stroke.
+                // The rim follows the thermal gradient, not a fixed touch circle.
+                float hLeft=heat[x>0?i-1:i];
+                float hRight=heat[x<WIDTH-1?i+1:i];
+                float hTop=heat[y>0?i-WIDTH:i];
+                float hBottom=heat[y<HEIGHT-1?i+WIDTH:i];
+                float rimSlope=(float)Math.sqrt(
+                    (hRight-hLeft)*(hRight-hLeft)+
+                    (hBottom-hTop)*(hBottom-hTop));
+                float liquidRim=Math.min(.11f,rimSlope*.75f)*
+                    (1f-fade(.5f,1f,warmth));
+                float opacity=(mist+ice+sparkle+crystalLight+liquidRim)*strength;
                 // Soft contact-pressure falloff: no hard-edged black marker stroke.
                 if(age<1.3f){
                     float warmOpacity=(1f-fade(.12f,1.3f,age))*meltDepth[i];
@@ -279,7 +313,7 @@ public final class IceGlassLayer {
                 opacity=Math.max(0,Math.min(.55f,opacity));
                 int alpha=(int)(opacity*255);
                 // Cooler crystal highlights; subtle translucent condensation grains.
-                int rgb=vein>.31f||crystalLight>.03f?
+                int rgb=vein>.31f||crystalLight>.03f||liquidRim>.025f?
                     0xffe5f9ff:0xffb8d6e7;
                 int vary=(int)((grain[i]-.5f)*12);
                 int r=Math.max(0,Math.min(255,((rgb>>16)&255)+vary));
