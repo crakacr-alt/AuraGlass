@@ -34,6 +34,16 @@ public final class QaEntryActivity extends Activity {
             }
             finish();return;
         }
+        if("ice_multitouch".equals(target)){
+            new Thread(()->{
+                try{android.util.Log.i("AURA_QA",FrostSelfTest.runMultitouch());}
+                catch(Throwable e){
+                    android.util.Log.e("AURA_QA","ICE_MULTITOUCH_EXCEPTION",e);
+                    android.util.Log.i("AURA_QA","ICE_MULTITOUCH_FAILED");
+                }finally{runOnUiThread(this::finish);}
+            },"AURA-multitouch-qa").start();
+            return;
+        }
         if("ice_physics".equals(target)){
             new Thread(()->{
                 try{
