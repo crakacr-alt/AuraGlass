@@ -12,6 +12,7 @@ public final class SnowEdgeLayer {
     private final Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Path path=new Path();
     private final float[] nodes=new float[26];
+    private final float[] meltAtNode=new float[26];
     private long startedAt=SystemClock.uptimeMillis();
     // Retain a short trail so a swipe melts along its entire path, not only its last point.
     private static final int TOUCH_SAMPLES=32;
@@ -39,24 +40,28 @@ public final class SnowEdgeLayer {
         float maxDepth=Math.min(height*.085f,width*.033f)*amount;
         if(maxDepth<.35f)return;
         float radius=Math.max(12f,width*.12f);
+        java.util.Arrays.fill(meltAtNode,0f);
+        // Skip inactive touch samples before iterating across snow nodes.
+        for(int sample=0;sample<TOUCH_SAMPLES;sample++){
+            long touched=touchTimes[sample];
+            if(touched==0||now<touched||now-touched>=7000)continue;
+            float age=(now-touched)/1000f;
+            float recover=Math.max(0f,Math.min(1f,(age-.5f)/6.5f));
+            recover=recover*recover*(3f-2f*recover);
+            float remaining=1f-recover;
+            for(int i=0;i<nodes.length;i++){
+                float x=i*width/(nodes.length-1);
+                float dx=(x-touchXs[sample])/radius;
+                if(Math.abs(dx)>2.5f)continue;
+                float local=(float)Math.exp(-dx*dx)*remaining;
+                meltAtNode[i]=Math.max(meltAtNode[i],local);
+            }
+        }
         path.reset();
         path.moveTo(0,0);
         for(int i=0;i<nodes.length;i++){
             float x=i*width/(nodes.length-1);
-            float melt=0f;
-            for(int sample=0;sample<TOUCH_SAMPLES;sample++){
-                long touched=touchTimes[sample];
-                if(touched==0||now<touched||now-touched>=7000)continue;
-                float age=(now-touched)/1000f;
-                if(age>=7f)continue;
-                float recover=Math.max(0f,Math.min(1f,(age-.5f)/6.5f));
-                recover=recover*recover*(3f-2f*recover);
-                float dx=(x-touchXs[sample])/radius;
-                if(Math.abs(dx)>2.5f)continue;
-                float local=(float)Math.exp(-dx*dx)*(1f-recover);
-                melt=Math.max(melt,local);
-            }
-            float y=Math.max(.25f,maxDepth*nodes[i]*(1-melt*.96f));
+            float y=Math.max(.25f,maxDepth*nodes[i]*(1f-meltAtNode[i]*.96f));
             path.lineTo(x,y);
         }
         path.lineTo(width,0);
