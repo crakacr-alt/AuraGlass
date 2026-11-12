@@ -92,7 +92,8 @@ public final class Activation {
     }
 
     public static void chooseSystemHome(Activity activity) {
-        if (!launch(activity, new Intent(Settings.ACTION_HOME_SETTINGS))) {
+        if (!launch(activity, new Intent(Settings.ACTION_HOME_SETTINGS)) &&
+                !launch(activity, new Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS))) {
             explain(activity, "Откройте Настройки → Приложения → Приложения по умолчанию → Главный экран");
         }
     }
