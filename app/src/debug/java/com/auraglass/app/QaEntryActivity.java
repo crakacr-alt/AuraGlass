@@ -26,6 +26,14 @@ public final class QaEntryActivity extends Activity {
         }
         String target=getIntent()==null?"":getIntent().getStringExtra("target");
         Class<? extends Activity> page=null;
+        if("aurora_field".equals(target)){
+            try{android.util.Log.i("AURA_QA",AuroraSelfTest.run());}
+            catch(Throwable e){
+                android.util.Log.e("AURA_QA","AURORA_FIELD_EXCEPTION",e);
+                android.util.Log.i("AURA_QA","AURORA_FIELD_FAILED");
+            }
+            finish();return;
+        }
         if("solar_cycle".equals(target)){
             try{android.util.Log.i("AURA_QA",SolarSelfTest.run());}
             catch(Throwable e){
