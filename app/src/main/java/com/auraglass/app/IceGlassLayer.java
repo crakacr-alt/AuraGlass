@@ -62,12 +62,19 @@ public final class IceGlassLayer {
     }
 
     public void configure(float intensity,float recovery,float radius,boolean interaction,boolean reduced){
-        this.intensity=Math.max(0,Math.min(1,intensity));
-        this.recovery=Math.max(.4f,Math.min(2.6f,recovery));
-        this.touchRadius=Math.max(.018f,Math.min(.085f,radius));
+        float nextIntensity=Math.max(0,Math.min(1,intensity));
+        float nextRecovery=Math.max(.4f,Math.min(2.6f,recovery));
+        float nextRadius=Math.max(.018f,Math.min(.085f,radius));
+        // Configuration may be applied on every wallpaper frame. Do not
+        // invalidate a 240x512 CPU mask unless its visible inputs change.
+        boolean maskChanged=this.intensity!=nextIntensity ||
+                this.recovery!=nextRecovery;
+        this.intensity=nextIntensity;
+        this.recovery=nextRecovery;
+        this.touchRadius=nextRadius;
         this.interaction=interaction;
         this.reducedMotion=reduced;
-        lastBitmap=0;
+        if(maskChanged)lastBitmap=0;
     }
 
     private void stamp(float x,float y,float value){
