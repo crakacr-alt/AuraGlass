@@ -63,11 +63,15 @@ public final class Activation {
                     Toast.makeText(activity, "AURA уже выбрана домашним экраном", Toast.LENGTH_SHORT).show();
                     return;
                 }
-                if (launch(activity, roles.createRequestRoleIntent(RoleManager.ROLE_HOME))) return;
+                if (launch(activity, roles.createRequestRoleIntent(RoleManager.ROLE_HOME))) {
+                    Toast.makeText(activity, "Если окно выбора не появилось, откройте настройки главного экрана", Toast.LENGTH_LONG).show();
+                    return;
+                }
             }
         }
         if (!launch(activity, new Intent(Settings.ACTION_HOME_SETTINGS))) {
-            explain(activity, "Откройте Настройки → Приложения → Приложения по умолчанию → Главный экран");
+            if (!launch(activity, new Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS)))
+                explain(activity, "Откройте Настройки → Приложения → Приложения по умолчанию → Главный экран");
         }
     }
 
