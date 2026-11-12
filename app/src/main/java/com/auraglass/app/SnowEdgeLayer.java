@@ -18,6 +18,9 @@ public final class SnowEdgeLayer {
     private final float[] touchXs=new float[TOUCH_SAMPLES];
     private final long[] touchTimes=new long[TOUCH_SAMPLES];
     private int nextTouch=0;
+    private final LinearGradient snowGradient=new LinearGradient(0,0,0,1,
+        new int[]{0xbef4fbff,0x93d6eeff,0x00b3d9f6},null,Shader.TileMode.CLAMP);
+    private final android.graphics.Matrix gradientMatrix=new android.graphics.Matrix();
 
     public SnowEdgeLayer(){
         java.util.Random random=new java.util.Random(4109L);
@@ -43,12 +46,13 @@ public final class SnowEdgeLayer {
             float melt=0f;
             for(int sample=0;sample<TOUCH_SAMPLES;sample++){
                 long touched=touchTimes[sample];
-                if(touched==0||now<touched)continue;
+                if(touched==0||now<touched||now-touched>=7000)continue;
                 float age=(now-touched)/1000f;
                 if(age>=7f)continue;
                 float recover=Math.max(0f,Math.min(1f,(age-.5f)/6.5f));
                 recover=recover*recover*(3f-2f*recover);
                 float dx=(x-touchXs[sample])/radius;
+                if(Math.abs(dx)>2.5f)continue;
                 float local=(float)Math.exp(-dx*dx)*(1f-recover);
                 melt=Math.max(melt,local);
             }
@@ -58,8 +62,9 @@ public final class SnowEdgeLayer {
         path.lineTo(width,0);
         path.close();
         p.setStyle(Paint.Style.FILL);
-        p.setShader(new LinearGradient(0,0,0,Math.max(1,maxDepth*2.1f),
-            new int[]{0xbef4fbff,0x93d6eeff,0x00b3d9f6},null,Shader.TileMode.CLAMP));
+        gradientMatrix.setScale(1f,Math.max(1f,maxDepth*2.1f));
+        snowGradient.setLocalMatrix(gradientMatrix);
+        p.setShader(snowGradient);
         canvas.drawPath(path,p);
         p.setShader(null);
         p.setStyle(Paint.Style.STROKE);
