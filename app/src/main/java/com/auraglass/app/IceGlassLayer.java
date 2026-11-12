@@ -47,7 +47,10 @@ public final class IceGlassLayer {
     private float touchRadius=0.035f;
     private boolean interaction=true;
     private boolean reducedMotion=false;
-    private float previousX=-1,previousY=-1;
+    // Each Android pointer owns a separate trail. A second finger must never
+    // connect its melt path to the first finger or to a lifted pointer.
+    private final android.util.SparseArray<float[]> previousByPointer=
+        new android.util.SparseArray<>();
     private int lastW,lastH;
 
     public IceGlassLayer(){
@@ -152,34 +155,47 @@ public final class IceGlassLayer {
     }
 
     public void startStroke(float x,float y,int width,int height,long now){
-        if(!interaction)return;
-        previousX=-1;previousY=-1;
-        stroke(x,y,width,height,now);
+        startStroke(0,x,y,width,height,now);
     }
 
     public void stroke(float x,float y,int width,int height,long now){
+        stroke(0,x,y,width,height,now);
+    }
+
+    public void endStroke(){previousByPointer.clear();}
+
+    public void startStroke(int pointerId,float x,float y,int width,int height,long now){
+        previousByPointer.remove(pointerId);
+        stroke(pointerId,x,y,width,height,now);
+    }
+
+    public void stroke(int pointerId,float x,float y,int width,int height,long now){
         if(!interaction||width<=0||height<=0)return;
         lastW=width;lastH=height;
         lastTouchedGlobal=now;
         float nx=Math.max(0,Math.min(1,x/width));
         float ny=Math.max(0,Math.min(1,y/height));
         float px=nx*WIDTH,py=ny*HEIGHT;
-        if(previousX>=0){
-            float distance=(float)Math.hypot(px-previousX,py-previousY);
-            // Preserve coverage even for fast long swipes across the display.
-            // The old 45-stamp cap could leave visible gaps on tall screens.
+        float[] previous=previousByPointer.get(pointerId);
+        if(previous!=null){
+            float distance=(float)Math.hypot(px-previous[0],py-previous[1]);
+            // Every pointer independently interpolates fast swipes.
             int steps=Math.min(320,Math.max(1,(int)Math.ceil(distance/1.8f)));
-            for(int s=0;s<steps;s++){
-                float f=s/(float)steps;
-                melt(previousX+(px-previousX)*f,previousY+(py-previousY)*f,width,height,now);
+            for(int step=0;step<steps;step++){
+                float f=step/(float)steps;
+                melt(previous[0]+(px-previous[0])*f,
+                    previous[1]+(py-previous[1])*f,width,height,now);
             }
+            previous[0]=px;
+            previous[1]=py;
+        }else{
+            previousByPointer.put(pointerId,new float[]{px,py});
         }
         melt(px,py,width,height,now);
-        previousX=px;previousY=py;
         lastBitmap=0;
     }
 
-    public void endStroke(){previousX=-1;previousY=-1;}
+    public void endStroke(int pointerId){previousByPointer.remove(pointerId);}
 
     private void melt(float x,float y,int width,int height,long now){
         // Circular contact radius in *screen pixels*, not elliptical normalized coordinates.
