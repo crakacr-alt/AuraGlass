@@ -105,6 +105,13 @@ public final class AtmosphereRenderer {
         iceGlass.stroke(x,y,width,height,when);
     }
     public void endTouch(){iceGlass.endStroke();}
+    public void startTouch(int pointerId,float x,float y,int width,int height,long when){
+        iceGlass.startStroke(pointerId,x,y,width,height,when);
+    }
+    public void moveTouch(int pointerId,float x,float y,int width,int height,long when){
+        iceGlass.stroke(pointerId,x,y,width,height,when);
+    }
+    public void endTouch(int pointerId){iceGlass.endStroke(pointerId);}
     private int alpha(int color,int a){return (color&0x00ffffff)|(Math.max(0,Math.min(a,255))<<24);}
     private int blend(int a,int b,float t){
         t=Config.clamp(t,0,1);

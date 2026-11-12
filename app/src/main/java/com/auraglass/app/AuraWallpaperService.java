@@ -45,18 +45,25 @@ public final class AuraWallpaperService extends WallpaperService {
         @Override public void onTouchEvent(MotionEvent event){
             if(!active||!visible||event==null)return;
             int type=event.getActionMasked();
-            if(type==MotionEvent.ACTION_DOWN){
-                renderer.startTouch(event.getX(),event.getY(),w,h,event.getEventTime());
+            int index=event.getActionIndex();
+            if(type==MotionEvent.ACTION_DOWN||type==MotionEvent.ACTION_POINTER_DOWN){
+                renderer.startTouch(event.getPointerId(index),
+                    event.getX(index),event.getY(index),w,h,event.getEventTime());
                 schedule(0);
             }else if(type==MotionEvent.ACTION_MOVE){
-                int n=event.getHistorySize();
-                for(int i=0;i<n;i++){
-                    renderer.moveTouch(event.getHistoricalX(i),event.getHistoricalY(i),w,h,
-                        event.getHistoricalEventTime(i));
+                for(int pointer=0;pointer<event.getPointerCount();pointer++){
+                    int pointerId=event.getPointerId(pointer);
+                    for(int i=0;i<event.getHistorySize();i++){
+                        renderer.moveTouch(pointerId,event.getHistoricalX(pointer,i),
+                            event.getHistoricalY(pointer,i),w,h,event.getHistoricalEventTime(i));
+                    }
+                    renderer.moveTouch(pointerId,event.getX(pointer),
+                        event.getY(pointer),w,h,event.getEventTime());
                 }
-                renderer.moveTouch(event.getX(),event.getY(),w,h,event.getEventTime());
                 schedule(0);
-            }else if(type==MotionEvent.ACTION_UP||type==MotionEvent.ACTION_CANCEL){
+            }else if(type==MotionEvent.ACTION_POINTER_UP||type==MotionEvent.ACTION_UP){
+                renderer.endTouch(event.getPointerId(index));
+            }else if(type==MotionEvent.ACTION_CANCEL){
                 renderer.endTouch();
             }
         }

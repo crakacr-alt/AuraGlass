@@ -84,23 +84,39 @@ public final class AtmospherePreviewView extends View {
     @Override public boolean onTouchEvent(MotionEvent event){
         if(event==null)return false;
         int type=event.getActionMasked();
-        if(type==MotionEvent.ACTION_DOWN){
-            getParent().requestDisallowInterceptTouchEvent(true);
-            if(Config.bool(getContext(),"haptics",true))
-                performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK);
-            renderer.startTouch(event.getX(),event.getY(),getWidth(),getHeight(),event.getEventTime());
+        int index=event.getActionIndex();
+        if(type==MotionEvent.ACTION_DOWN||type==MotionEvent.ACTION_POINTER_DOWN){
+            if(type==MotionEvent.ACTION_DOWN){
+                getParent().requestDisallowInterceptTouchEvent(true);
+                if(Config.bool(getContext(),"haptics",true))
+                    performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK);
+            }
+            renderer.startTouch(event.getPointerId(index),
+                event.getX(index),event.getY(index),
+                getWidth(),getHeight(),event.getEventTime());
             invalidate();
             return true;
         }
         if(type==MotionEvent.ACTION_MOVE){
-            for(int i=0;i<event.getHistorySize();i++){
-                renderer.moveTouch(event.getHistoricalX(i),event.getHistoricalY(i),
-                    getWidth(),getHeight(),event.getHistoricalEventTime(i));
+            for(int pointer=0;pointer<event.getPointerCount();pointer++){
+                int pointerId=event.getPointerId(pointer);
+                for(int i=0;i<event.getHistorySize();i++){
+                    renderer.moveTouch(pointerId,event.getHistoricalX(pointer,i),
+                        event.getHistoricalY(pointer,i),getWidth(),getHeight(),
+                        event.getHistoricalEventTime(i));
+                }
+                renderer.moveTouch(pointerId,event.getX(pointer),event.getY(pointer),
+                    getWidth(),getHeight(),event.getEventTime());
             }
-            renderer.moveTouch(event.getX(),event.getY(),getWidth(),getHeight(),event.getEventTime());
             invalidate();return true;
         }
-        if(type==MotionEvent.ACTION_UP||type==MotionEvent.ACTION_CANCEL){
+        if(type==MotionEvent.ACTION_POINTER_UP||type==MotionEvent.ACTION_UP){
+            renderer.endTouch(event.getPointerId(index));
+            if(type==MotionEvent.ACTION_UP)
+                getParent().requestDisallowInterceptTouchEvent(false);
+            return true;
+        }
+        if(type==MotionEvent.ACTION_CANCEL){
             renderer.endTouch();
             getParent().requestDisallowInterceptTouchEvent(false);
             return true;

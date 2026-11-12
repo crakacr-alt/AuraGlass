@@ -67,22 +67,36 @@ public final class IceShowcaseActivity extends Activity {
             if(active)FramePacer.schedule(this,budget,start);
         }
         @Override public boolean onTouchEvent(MotionEvent event){
+            if(event==null)return false;
             int action=event.getActionMasked();
-            if(action==MotionEvent.ACTION_DOWN){
-                if(Config.bool(IceShowcaseActivity.this,"haptics",true))
+            int index=event.getActionIndex();
+            if(action==MotionEvent.ACTION_DOWN||action==MotionEvent.ACTION_POINTER_DOWN){
+                if(action==MotionEvent.ACTION_DOWN&&
+                    Config.bool(IceShowcaseActivity.this,"haptics",true))
                     performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK);
-                renderer.startTouch(event.getX(),event.getY(),getWidth(),getHeight(),event.getEventTime());
+                renderer.startTouch(event.getPointerId(index),
+                    event.getX(index),event.getY(index),
+                    getWidth(),getHeight(),event.getEventTime());
                 invalidate();return true;
             }
             if(action==MotionEvent.ACTION_MOVE){
-                for(int i=0;i<event.getHistorySize();i++){
-                    renderer.moveTouch(event.getHistoricalX(i),event.getHistoricalY(i),
-                        getWidth(),getHeight(),event.getHistoricalEventTime(i));
+                for(int pointer=0;pointer<event.getPointerCount();pointer++){
+                    int id=event.getPointerId(pointer);
+                    for(int i=0;i<event.getHistorySize();i++){
+                        renderer.moveTouch(id,event.getHistoricalX(pointer,i),
+                            event.getHistoricalY(pointer,i),
+                            getWidth(),getHeight(),event.getHistoricalEventTime(i));
+                    }
+                    renderer.moveTouch(id,event.getX(pointer),event.getY(pointer),
+                        getWidth(),getHeight(),event.getEventTime());
                 }
-                renderer.moveTouch(event.getX(),event.getY(),getWidth(),getHeight(),event.getEventTime());
                 invalidate();return true;
             }
-            if(action==MotionEvent.ACTION_UP||action==MotionEvent.ACTION_CANCEL){
+            if(action==MotionEvent.ACTION_POINTER_UP||action==MotionEvent.ACTION_UP){
+                renderer.endTouch(event.getPointerId(index));
+                invalidate();return true;
+            }
+            if(action==MotionEvent.ACTION_CANCEL){
                 renderer.endTouch();invalidate();return true;
             }
             return true;

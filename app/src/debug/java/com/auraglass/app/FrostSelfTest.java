@@ -59,4 +59,38 @@ public final class FrostSelfTest {
             bitmap.recycle();
         }
     }
+    /** Two simultaneous contacts must melt locally without a connecting diagonal. */
+    public static String runMultitouch(){
+        IceGlassLayer frost=new IceGlassLayer();
+        frost.configure(1f,1f,.065f,true,true);
+        Bitmap bitmap=Bitmap.createBitmap(240,512,Bitmap.Config.ARGB_8888);
+        try{
+            Canvas canvas=new Canvas(bitmap);
+            long time=150000L;
+            render(frost,canvas,time);
+            double firstBefore=averageOpacity(bitmap,14,170,5);
+            double secondBefore=averageOpacity(bitmap,226,370,5);
+            double middleBefore=averageOpacity(bitmap,120,270,6);
+            frost.startStroke(7,14,170,240,512,time+80);
+            frost.startStroke(19,226,370,240,512,time+80);
+            frost.stroke(7,18,178,240,512,time+100);
+            frost.stroke(19,222,362,240,512,time+100);
+            frost.endStroke(7);
+            frost.endStroke(19);
+            render(frost,canvas,time+160);
+            double firstAfter=averageOpacity(bitmap,14,170,5);
+            double secondAfter=averageOpacity(bitmap,226,370,5);
+            double middleAfter=averageOpacity(bitmap,120,270,6);
+            double midpointDelta=Math.abs(middleAfter-middleBefore);
+            boolean okay=firstBefore-firstAfter>1.5&&
+                secondBefore-secondAfter>1.5&&midpointDelta<2.5;
+            return String.format(java.util.Locale.ROOT,
+                "%s firstDelta=%.2f secondDelta=%.2f midpointDelta=%.2f",
+                okay?"ICE_MULTITOUCH_OK":"ICE_MULTITOUCH_FAILED",
+                firstBefore-firstAfter,secondBefore-secondAfter,midpointDelta);
+        }finally{
+            bitmap.recycle();
+        }
+    }
+
 }
