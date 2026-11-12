@@ -35,12 +35,12 @@ public final class SnowEdgeLayer {
         float amount=Math.max(0,Math.min(1,strength))*grown;
         float maxDepth=Math.min(height*.085f,width*.033f)*amount;
         if(maxDepth<.35f)return;
+        float radius=Math.max(12f,width*.12f);
         path.reset();
         path.moveTo(0,0);
         for(int i=0;i<nodes.length;i++){
             float x=i*width/(nodes.length-1);
             float melt=0f;
-            float radius=Math.max(12f,width*.12f);
             for(int sample=0;sample<TOUCH_SAMPLES;sample++){
                 long touched=touchTimes[sample];
                 if(touched==0||now<touched)continue;
