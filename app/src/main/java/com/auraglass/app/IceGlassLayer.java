@@ -292,7 +292,19 @@ public final class IceGlassLayer {
                 float facet=Math.min(.16f,(specular*.10f+fresnel*.18f)*vein);
                 float sparkle=(grain[i]>.982f?vein*.12f*frozen:0)*(1f-warmth);
                 float crystalLight=facet*frozen*(1f-.85f*warmth);
-                float opacity=(mist+ice+sparkle+crystalLight)*strength;
+                // The liquid boundary behaves like a curved meniscus: its
+                // slope produces a restrained highlight around a warm stroke.
+                // The rim follows the thermal gradient, not a fixed touch circle.
+                float hLeft=heat[x>0?i-1:i];
+                float hRight=heat[x<WIDTH-1?i+1:i];
+                float hTop=heat[y>0?i-WIDTH:i];
+                float hBottom=heat[y<HEIGHT-1?i+WIDTH:i];
+                float rimSlope=(float)Math.sqrt(
+                    (hRight-hLeft)*(hRight-hLeft)+
+                    (hBottom-hTop)*(hBottom-hTop));
+                float liquidRim=Math.min(.11f,rimSlope*.75f)*
+                    (1f-fade(.5f,1f,warmth));
+                float opacity=(mist+ice+sparkle+crystalLight+liquidRim)*strength;
                 // Soft contact-pressure falloff: no hard-edged black marker stroke.
                 if(age<1.3f){
                     float warmOpacity=(1f-fade(.12f,1.3f,age))*meltDepth[i];
@@ -301,7 +313,7 @@ public final class IceGlassLayer {
                 opacity=Math.max(0,Math.min(.55f,opacity));
                 int alpha=(int)(opacity*255);
                 // Cooler crystal highlights; subtle translucent condensation grains.
-                int rgb=vein>.31f||crystalLight>.03f?
+                int rgb=vein>.31f||crystalLight>.03f||liquidRim>.025f?
                     0xffe5f9ff:0xffb8d6e7;
                 int vary=(int)((grain[i]-.5f)*12);
                 int r=Math.max(0,Math.min(255,((rgb>>16)&255)+vary));
