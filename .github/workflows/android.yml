@@ -107,6 +107,11 @@ jobs:
             sleep 13
             adb logcat -d -s AURA_QA:I > screenshots/ice-physics.txt
             grep -q 'ICE_PHYSICS_OK' screenshots/ice-physics.txt
+            adb logcat -c
+            adb shell am start -W -n com.auraglass.app/.QaEntryActivity --es target ice_multitouch
+            sleep 2
+            adb logcat -d -s AURA_QA:I > screenshots/ice-multitouch.txt
+            grep -q 'ICE_MULTITOUCH_OK' screenshots/ice-multitouch.txt
             adb shell am start -W -n com.auraglass.app/.QaEntryActivity --es target folders
             sleep 1
             adb logcat -d -s AURA_QA:I > screenshots/folder-crud.txt
