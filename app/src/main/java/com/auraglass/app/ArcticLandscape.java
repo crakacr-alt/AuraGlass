@@ -95,10 +95,14 @@ public final class ArcticLandscape {
                     float x=x0+full*i/SAMPLES;
                     float y=height[layer][i];
                     float slope=(height[layer][i+4]-height[layer][i-4])/8f;
-                    float cover=Math.max(0f,.75f-ridge(i/(float)SAMPLES,21+layer*19));
-                    if(cover<.12f||slope<-.75f)continue;
+                    float summit=ridge(i/(float)SAMPLES,21+layer*19);
+                    // Snow accumulates on *higher* peaks. Earlier inverted
+                    // coverage gave every low shoulder identical diagonal
+                    // hatching, which looked like a drawing, not a glacier.
+                    float cover=Math.max(0f,(summit-.57f)*2.2f);
+                    if(cover<.10f||slope<-.75f)continue;
                     float distance=full*(layer==0?.032f:.021f);
-                    float drop=h*(layer==0?.019f:.012f)*(cover+.25f);
+                    float drop=h*(layer==0?.020f:.014f)*(.25f+cover);
                     snow.moveTo(x-full*.004f,y+1);
                     snow.lineTo(x+distance*.55f,y+drop*.6f);
                     snow.lineTo(x+distance,y+drop*1.7f);
@@ -151,7 +155,7 @@ public final class ArcticLandscape {
             if(layer<3){
                 float lit=(.40f+.48f*day+.12f*twilight)*(1f-layer*.22f);
                 details.setColor(0xffd4e8f1);
-                details.setAlpha((int)(Math.min(1f,lit)*(layer==0?105:75)));
+                details.setAlpha((int)(Math.min(1f,lit)*(layer==0?72:50)));
                 canvas.drawPath(snowFace[layer],details);
                 details.setAlpha(255);
             }
