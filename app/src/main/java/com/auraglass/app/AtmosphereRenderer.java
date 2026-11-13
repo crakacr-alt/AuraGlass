@@ -17,7 +17,7 @@ import java.util.Random;
 public final class AtmosphereRenderer {
     private final Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Path sunRayPath=new Path();
-    private final Path ridgePath=new Path();
+    private final ArcticLandscape landscape=new ArcticLandscape();
     private final SparseArray<Shader> glowShaders=new SparseArray<>();
     private final Paint glowPaint=new Paint(Paint.ANTI_ALIAS_FLAG);
     private final AuroraCurtainLayer auroraCurtains=new AuroraCurtainLayer();
@@ -205,24 +205,37 @@ public final class AtmosphereRenderer {
         boolean snow=snowPower>.005f;
         boolean fog=fogPower>.005f;
         float motion=reduceMotion?0:t;
-        int top=blend(Color.rgb(13,21,50),Color.rgb(116,155,193),daylight);
-        top=blend(top,Color.rgb(113,86,142),twilight*.68f);
-        int center=blend(Color.rgb(41,45,92),Color.rgb(200,186,211),daylight);
-        center=blend(center,Color.rgb(220,131,157),twilight*.72f);
-        int bottom=blend(Color.rgb(88,75,116),Color.rgb(225,201,204),daylight);
-        bottom=blend(bottom,Color.rgb(255,169,129),twilight*.63f);
-        if(ice){top=blend(top,Color.rgb(57,103,144),.28f*icePower);bottom=blend(bottom,Color.rgb(151,194,214),.20f*icePower);}
-        if(rain){top=blend(top,Color.rgb(43,57,83),.32f*rainPower);center=blend(center,Color.rgb(75,89,122),.25f*rainPower);}
+        // Nordic cinematic grade: deep low-light blue rather than lavender
+        // pastels. Dawn brings physically motivated warm scattering at the
+        // horizon, while weather desaturates the upper atmosphere.
+        int top=blend(Color.rgb(5,13,28),Color.rgb(86,134,165),daylight);
+        top=blend(top,Color.rgb(57,34,75),twilight*.44f);
+        int center=blend(Color.rgb(17,39,65),Color.rgb(155,187,199),daylight);
+        center=blend(center,Color.rgb(122,76,100),twilight*.48f);
+        int bottom=blend(Color.rgb(36,62,83),Color.rgb(218,213,197),daylight);
+        bottom=blend(bottom,Color.rgb(186,102,91),twilight*.61f);
+        if(ice){
+            top=blend(top,Color.rgb(8,33,52),.30f*icePower);
+            center=blend(center,Color.rgb(24,79,96),.24f*icePower);
+        }
+        if(rain){
+            top=blend(top,Color.rgb(26,43,57),.48f*rainPower);
+            center=blend(center,Color.rgb(62,77,83),.33f*rainPower);
+        }
         p.setStyle(Paint.Style.FILL);p.setShader(new LinearGradient(0,0,w,h,
             new int[]{top,center,bottom},new float[]{0,.56f,1},Shader.TileMode.CLAMP));
         c.drawRect(0,0,w,h,p);p.setShader(null);
-        glow(c,w*.76f,h*(.24f+.11f*(1-daylight)),w*.75f,alpha(Color.rgb(241,179,221),(int)(61+daylight*35)));
-        glow(c,w*.12f,h*.77f,w*.7f,alpha(Color.rgb(122,165,225),72));
+        // Broad, dim airglow and scattering instead of isolated opaque blobs.
+        glow(c,w*.81f,h*.42f,w*.93f,
+            alpha(0xff5f9db2,(int)(22+daylight*25)));
+        glow(c,w*.17f,h*.72f,w*.86f,
+            alpha(0xff6f9fad,(int)(30+daylight*15)));
         if(daylight>.08f){
             float sunX=w*(.22f+.49f*daylight);
             float sunY=h*(.34f-.22f*daylight);
             glow(c,sunX,sunY,w*.58f,alpha(Color.rgb(255,231,187),(int)(93*daylight)));
-            disk(c,sunX,sunY,Math.max(6,w*.045f),alpha(Color.WHITE,(int)(190*daylight)));
+            disk(c,sunX,sunY,Math.max(6,w*.040f),
+                alpha(0xffffe9c4,(int)(205*daylight)));
             p.setColor(alpha(Color.rgb(255,230,194),(int)(daylight*14)));
             for(int i=0;i<8;i++){
                 double a=i*Math.PI/4+.12;
@@ -258,13 +271,8 @@ public final class AtmosphereRenderer {
             }
             // Smooth, separately phased time-lapse comets are handled by CelestialLayer.
         }
-        for(int i=0;i<4;i++){
-            float fx=rx[80+i]*w+ (float)Math.sin(motion*.025+i)*w*.045f;
-            float fy=h*(.29f+i*.14f);
-            float size=w*(.22f+.1f*rs[80+i]);
-            glow(c,fx,fy,size,alpha(Color.WHITE,(int)(10+daylight*19)));
-        }
-        drawRidge(c,w,h,motion,daylight,twilight);
+        // Distant atmospheric haze falls behind deterministic glacial massifs.
+        landscape.draw(c,width,height,motion,daylight,twilight,parallaxX,renderQuality);
         if(rain)drawRain(c,w,h,motion,intensity*rainPower,lightning&&"storm".equals(weather));
         if(snow)drawSnow(c,w,h,motion,intensity*snowPower*renderQuality);
         if(fog)glow(c,w*.5f,h*.77f,w*.9f,alpha(0xffe4e7fa,(int)(75*fogPower)));
@@ -295,25 +303,6 @@ public final class AtmosphereRenderer {
         glowPaint.setShader(null);
         glowPaint.setAlpha(255);
         c.restore();
-    }
-    private void drawRidge(Canvas c,float w,float h,float t,float day,float eve){
-        for(int layer=0;layer<3;layer++){
-            float base=h*(.78f+layer*.09f);
-            ridgePath.rewind();
-            ridgePath.moveTo(0,h);
-            ridgePath.lineTo(0,base);
-            for(int x=0;x<=24;x++){
-                float px=w*x/24f;
-                float py=base+(float)Math.sin(x*.46f+layer*2.1f+t*.007f)*h*.025f
-                    +(float)Math.sin(x*.91f+layer*.7f)*h*.015f;
-                ridgePath.lineTo(px,py);
-            }
-            ridgePath.lineTo(w,h);ridgePath.close();
-            int near=blend(0xff232844,0xff536f83,day*.78f);
-            p.setColor(alpha(near,layer==0?84:layer==1?145:205));
-            c.drawPath(ridgePath,p);
-        }
-        glow(c,w*.6f,h*.95f,w*.6f,alpha(0xffffd7c3,(int)(eve*37)));
     }
     private void drawRain(Canvas c,float w,float h,float t,float amount,boolean storm){
         int count=Math.max(9,(int)(rx.length*amount*.78f));
