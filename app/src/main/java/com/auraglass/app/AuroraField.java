@@ -19,6 +19,9 @@ public final class AuroraField {
     private final float[][] ceiling;
     private final float[][] depth;
     private final float[][] filament;
+    // Height-dependent lateral advection bends the emission field into
+    // hanging curtains instead of straight vertical alpha columns.
+    private final int[][] rowShift;
     private final float[] pulse=new float[LAYERS];
     private final int[] pixels;
 
@@ -29,6 +32,7 @@ public final class AuroraField {
         ceiling=new float[LAYERS][width];
         depth=new float[LAYERS][width];
         filament=new float[LAYERS][width];
+        rowShift=new int[LAYERS][height];
     }
 
     public int[] pixels(){return pixels;}
@@ -54,14 +58,20 @@ public final class AuroraField {
                 float bend=slow*.034f+secondary*.013f;
                 // Ribbons drift across one another; the top and depth share
                 // a smoothly varying fold so the silhouette has no flat bands.
-                ceiling[layer][x]=.12f+layer*.075f+bend;
-                depth[layer][x]=.39f+layer*.057f+
-                    .045f*(float)Math.sin(u*5.6f+seconds*.075f+phase);
+                ceiling[layer][x]=.060f+layer*.095f+bend;
+                depth[layer][x]=.54f+layer*.040f+
+                    .034f*(float)Math.sin(u*5.6f+seconds*.075f+phase);
                 // Very low-contrast vertical fibrils, blurred by the broad
                 // emission envelope rather than painted as separate bars.
-                filament[layer][x]=.79f+
-                    .13f*(float)Math.sin(u*23.1f-seconds*.21f+phase)+
-                    .08f*(float)Math.sin(u*49.7f+seconds*.12f+phase*.6f);
+                filament[layer][x]=.72f+
+                    .18f*(float)Math.sin(u*31.1f-seconds*.24f+phase)+
+                    .10f*(float)Math.sin(u*71.7f+seconds*.12f+phase*.6f);
+            }
+            for(int y=0;y<height;y++){
+                float v=y/(float)height;
+                float curl=.016f*(float)Math.sin(v*6.8f+seconds*.10f+phase)+
+                    .008f*(float)Math.sin(v*12.1f-seconds*.06f+phase*.7f);
+                rowShift[layer][y]=Math.round(curl*width);
             }
         }
         int offset=0;
@@ -70,12 +80,18 @@ public final class AuroraField {
             for(int x=0;x<width;x++){
                 float energy=0f,r=0f,g=0f,b=0f,transmission=1f;
                 for(int layer=0;layer<LAYERS;layer++){
-                    float position=(v-ceiling[layer][x])/depth[layer][x];
+                    int warped=x+rowShift[layer][y];
+                    if(warped<0)warped=0;
+                    if(warped>=width)warped=width-1;
+                    float position=(v-ceiling[layer][warped])/depth[layer][warped];
                     if(position<=0f||position>=1f)continue;
-                    float entry=smooth(0f,.19f,position);
-                    float exit=1f-smooth(.40f,1f,position);
-                    float e=ENERGY[layer]*entry*exit*
-                        filament[layer][x]*pulse[layer];
+                    float entry=smooth(0f,.055f,position);
+                    float exit=1f-smooth(.23f,.99f,position);
+                    // Bright upper rim, translucent falling folds, fine
+                    // turbulent variation. No opaque rectangular ribbon.
+                    float upper=1f-.32f*smooth(.08f,.72f,position);
+                    float e=ENERGY[layer]*entry*exit*upper*
+                        filament[layer][warped]*pulse[layer];
                     if(e<=.0001f)continue;
                     // Front-to-back coverage accumulation; smooth layers
                     // overlap without producing opaque geometry or seams.
