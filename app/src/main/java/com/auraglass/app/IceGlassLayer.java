@@ -28,6 +28,8 @@ public final class IceGlassLayer {
     // One-time subpixel coverage filter makes diagonal dendrites continuous
     // instead of leaving pixel-spaced gaps when the mask is enlarged.
     private final float[] crystalCoverage=new float[COUNT];
+    private final float[] crystalBloom=new float[COUNT];
+    private final float[] bloomScratch=new float[COUNT];
     private final float[] meltDepth=new float[COUNT];
     private final float[] grain=new float[COUNT];
     private final long[] touchedAt=new long[COUNT];
@@ -97,10 +99,10 @@ public final class IceGlassLayer {
             x+=(float)Math.cos(angle)*step;
             y+=(float)Math.sin(angle)*step;
             drawCrystalLine(oldX,oldY,x,y,level==0?.52f:.31f);
-            if(level<2&&j>2&&j%6==0){
+            if(level<2&&j>2&&j%5==0){
                 float side=(rng.nextBoolean()?1:-1)*(.64f+rng.nextFloat()*.19f);
                 growBranch(x,y,angle+side,step*.67f,
-                    Math.max(3,(int)((count-j)*.37f)),level+1);
+                    Math.max(3,(int)((count-j)*.42f)),level+1);
                 if(level==0&&j%8==0)
                     growBranch(x,y,angle-side,step*.71f,
                         Math.max(4,(int)((count-j)*.33f)),level+1);
@@ -123,7 +125,7 @@ public final class IceGlassLayer {
 
     private void buildCrystals(){
         for(int edge=0;edge<4;edge++){
-            int colonies=edge<2?6:5;
+            int colonies=edge<2?9:8;
             for(int n=0;n<colonies;n++){
                 float lane=(n+rng.nextFloat()*.65f)/colonies;
                 float x,y,theta;
@@ -132,15 +134,25 @@ public final class IceGlassLayer {
                 else if(edge==2){x=lane*(WIDTH-1);y=1;theta=(float)Math.PI/2;}
                 else{x=lane*(WIDTH-1);y=HEIGHT-2;theta=-(float)Math.PI/2;}
                 theta+=(rng.nextFloat()-.5f)*.68f;
-                growBranch(x,y,theta,1.6f+rng.nextFloat()*.7f,21+rng.nextInt(17),0);
+                growBranch(x,y,theta,1.6f+rng.nextFloat()*.7f,29+rng.nextInt(19),0);
             }
+        }
+        // Real frost often nucleates around microscopic dust and moisture
+        // inside the pane, not exclusively on its geometric borders. Keep
+        // these interior colonies small and irregular to avoid repeated trees.
+        for(int n=0;n<16;n++){
+            float x=WIDTH*(.09f+.82f*rng.nextFloat());
+            float y=HEIGHT*(.10f+.77f*rng.nextFloat());
+            float angle=rng.nextFloat()*(float)(Math.PI*2);
+            growBranch(x,y,angle,1.1f+rng.nextFloat()*.6f,
+                12+rng.nextInt(14),0);
         }
     }
 
     private void prepareCrystalCoverage(){
-        // Static anti-aliasing: build once. Touch/refreeze changes only opacity.
-        // Along diagonals, 5-sample weighted coverage connects fine fern needles
-        // without thickening them into opaque white stripes.
+        // Static antialiasing connects thin needles. A separable soft Gaussian
+        // bloom gives them feathery micro-crystals instead of thick white twigs.
+        // Both kernels run once at construction, never during 60/120-Hz frames.
         for(int y=0;y<HEIGHT;y++){
             int row=y*WIDTH;
             for(int x=0;x<WIDTH;x++){
@@ -150,6 +162,30 @@ public final class IceGlassLayer {
                 float vertical=crystal[y>0?i-WIDTH:i]+crystal[y<HEIGHT-1?i+WIDTH:i];
                 crystalCoverage[i]=Math.min(1f,center*.62f+
                     horizontal*.095f+vertical*.095f);
+            }
+        }
+        for(int y=0;y<HEIGHT;y++){
+            int row=y*WIDTH;
+            for(int x=0;x<WIDTH;x++){
+                float sum=.24f*crystalCoverage[row+x];
+                for(int dx=1;dx<=3;dx++){
+                    float weight=dx==1?.20f:dx==2?.12f:.06f;
+                    sum+=weight*(crystalCoverage[row+Math.max(0,x-dx)]+
+                        crystalCoverage[row+Math.min(WIDTH-1,x+dx)]);
+                }
+                bloomScratch[row+x]=sum;
+            }
+        }
+        for(int y=0;y<HEIGHT;y++){
+            int row=y*WIDTH;
+            for(int x=0;x<WIDTH;x++){
+                float sum=.24f*bloomScratch[row+x];
+                for(int dy=1;dy<=3;dy++){
+                    float weight=dy==1?.20f:dy==2?.12f:.06f;
+                    sum+=weight*(bloomScratch[Math.max(0,y-dy)*WIDTH+x]+
+                        bloomScratch[Math.min(HEIGHT-1,y+dy)*WIDTH+x]);
+                }
+                crystalBloom[row+x]=Math.min(1f,sum);
             }
         }
     }
@@ -263,9 +299,10 @@ public final class IceGlassLayer {
                 float edge=Math.max(0,1-Math.min(Math.min(fx,1-fx)*4.4f,
                     Math.min(fy,1-fy)*2.9f));
                 edge=edge*edge;
-                float baseMist=.075f+edge*.13f;
+                float baseMist=.076f+edge*.12f+crystalBloom[i]*.12f;
                 float vein=crystalCoverage[i];
-                float dendrite=(crystal[i]*.65f+vein*.35f)*(.50f+.20f*edge);
+                float dendrite=(crystal[i]*.16f+vein*.22f+
+                    crystalBloom[i]*.62f)*(.62f+.14f*edge);
                 float age=touchedAt[i]==0?1000:(now-touchedAt[i])/(1000f*recovery);
                 // Recondensation after 1.3 s, soft droplets followed by crystallization at 3–7 s.
                 float moisture=fade(1.25f,3.2f,age);
@@ -329,8 +366,8 @@ public final class IceGlassLayer {
                 opacity=Math.max(0,Math.min(.55f,opacity));
                 int alpha=(int)(opacity*255);
                 // Cooler crystal highlights; subtle translucent condensation grains.
-                int rgb=vein>.31f||crystalLight>.03f||liquidRim>.025f?
-                    0xffe5f9ff:0xffb8d6e7;
+                int rgb=vein>.38f||crystalLight>.045f||liquidRim>.03f?
+                    0xffd3e8ef:0xffa9c9da;
                 int vary=(int)((grain[i]-.5f)*12);
                 int r=Math.max(0,Math.min(255,((rgb>>16)&255)+vary));
                 int g=Math.max(0,Math.min(255,((rgb>>8)&255)+vary));
