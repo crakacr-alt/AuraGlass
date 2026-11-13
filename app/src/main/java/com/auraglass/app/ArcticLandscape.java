@@ -1,11 +1,14 @@
 package com.auraglass.app;
 
+import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.LinearGradient;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.RadialGradient;
+import android.graphics.Rect;
+import android.graphics.RectF;
 import android.graphics.Shader;
 
 /**
@@ -27,6 +30,11 @@ public final class ArcticLandscape {
     private final Shader[] night=new Shader[LAYERS];
     private final Shader[] daylight=new Shader[LAYERS];
     private Shader haze,water;
+    private final Bitmap rockTexture;
+    private final Rect textureSource=new Rect(0,0,256,256);
+    private final RectF textureBounds=new RectF();
+    private final Paint texturePaint=new Paint(Paint.ANTI_ALIAS_FLAG|
+        Paint.FILTER_BITMAP_FLAG|Paint.DITHER_FLAG);
     private int cachedW=-1,cachedH=-1;
 
     public ArcticLandscape(){
@@ -34,6 +42,7 @@ public final class ArcticLandscape {
             terrain[i]=new Path();
             snowFace[i]=new Path();
         }
+        rockTexture=buildRockTexture();
     }
     private static float smooth(float t){
         t=Math.max(0f,Math.min(1f,t));
@@ -50,6 +59,37 @@ public final class ArcticLandscape {
         int a=(int)Math.floor(x);
         float t=smooth(x-a);
         return hash(a,seed)*(1-t)+hash(a+1,seed)*t;
+    }
+    private static float noise2d(float x,float y,int seed){
+        int ix=(int)Math.floor(x),iy=(int)Math.floor(y);
+        float fx=smooth(x-ix),fy=smooth(y-iy);
+        float a=hash(ix*827+iy*213,seed);
+        float b=hash((ix+1)*827+iy*213,seed);
+        float c=hash(ix*827+(iy+1)*213,seed);
+        float d=hash((ix+1)*827+(iy+1)*213,seed);
+        return (a+(b-a)*fx)*(1-fy)+(c+(d-c)*fx)*fy;
+    }
+    private static Bitmap buildRockTexture(){
+        // Small procedural normal/albedo impression, generated once:
+        // multi-scale ridged noise and slanted mineral strata. No downloaded
+        // photograph and no runtime network, shader, or per-frame allocations.
+        final int size=256;
+        int[] colors=new int[size*size];
+        for(int y=0;y<size;y++)for(int x=0;x<size;x++){
+            float u=x/(float)size,v=y/(float)size;
+            float coarse=noise2d(u*6f,v*5f,17);
+            float medium=noise2d(u*21f,v*14f,31);
+            float fine=noise2d(u*64f,v*43f,83);
+            float strata=.5f+.5f*(float)Math.sin(u*40f+v*69f+coarse*5.2f);
+            float light=.55f*coarse+.24f*medium+.12f*fine+.09f*strata;
+            int gray=105+(int)(88*light);
+            int alpha=23+(int)(58*Math.abs(light-.43f));
+            colors[y*size+x]=(alpha<<24)|(gray<<16)|
+                (Math.min(255,gray+14)<<8)|Math.min(255,gray+27);
+        }
+        Bitmap bitmap=Bitmap.createBitmap(size,size,Bitmap.Config.ARGB_8888);
+        bitmap.setPixels(colors,0,size,0,0,size,size);
+        return bitmap;
     }
     private static float ridge(float x,int seed){
         float broad=noise(x*3.6f,seed);
@@ -151,6 +191,17 @@ public final class ArcticLandscape {
             }
             fill.setShader(null);
             fill.setAlpha(255);
+            if(layer<3&&quality>=.62f){
+                // Semi-transparent rock and ice grain clipped exactly to the
+                // cached silhouette; avoids flat, plastic mountain shapes.
+                canvas.save();
+                canvas.clipPath(terrain[layer]);
+                textureBounds.set(-w*.10f+layer*13f,h*.42f,
+                    w*1.10f+layer*13f,h*.99f);
+                texturePaint.setAlpha(layer==0?170:layer==1?125:80);
+                canvas.drawBitmap(rockTexture,textureSource,textureBounds,texturePaint);
+                canvas.restore();
+            }
 
             if(layer<3){
                 float lit=(.40f+.48f*day+.12f*twilight)*(1f-layer*.22f);
