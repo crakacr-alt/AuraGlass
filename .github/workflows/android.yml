@@ -220,15 +220,17 @@ jobs:
             # Emulator reports boot_completed before Launcher3, Settings and
             # configuration settle. Opening consent immediately at first boot
             # can cancel ActivityResult when the initial HOME takes focus.
-            adb shell input keyevent 82
+            # Assign AURA as HOME *before* requesting AppWidget consent.
+            # Otherwise freshly booted Pixel 2 Quickstep may ANR over the
+            # consent dialog and make UIAutomator inspect the wrong window.
+            # Never switch HOME while the Settings consent Activity is open.
+            adb shell cmd role add-role-holder android.app.role.HOME com.auraglass.app
+            adb shell am force-stop com.android.launcher3 || true
             sleep 8
             adb shell am start -W -n com.auraglass.app/.SetupActivity
             sleep 3
             adb logcat -c
-            # Do NOT change the HOME role while Settings consent is in flight:
-            # asynchronous launcher switching can cancel ActivityResult before
-            # the user-consent button is tapped on a newly booted emulator.
-            # Exercise Android's ordinary consent flow; no privileged adb grant.
+            # Exercise ordinary user consent; never privilege-grant widgets.
             adb shell am start -W -n com.auraglass.app/.QaEntryActivity --es target widget_bind
             sleep 2
             adb logcat -d -s AURA_QA:I > widget-qa/widget-bind-initial.txt
@@ -239,9 +241,7 @@ jobs:
             adb shell dumpsys activity activities > widget-qa/activity-after-consent.txt
             adb exec-out screencap -p > widget-qa/consent-result.png
             if ! grep -q 'WIDGET_BIND_OK' widget-qa/widget-bind.txt; then cat widget-qa/widget-bind-diagnostics.txt; exit 1; fi
-            # Now the system consent Activity has finished, and only now
-            # assign the launcher role. This must not invalidate the bind.
-            adb shell cmd role add-role-holder android.app.role.HOME com.auraglass.app
+            # HOME role was established before consent and must remain stable.
             adb shell cmd role get-role-holders android.app.role.HOME > widget-qa/home-role.txt
             grep -q 'com.auraglass.app' widget-qa/home-role.txt
             adb shell am start -W -n com.auraglass.app/.HomeActivity
